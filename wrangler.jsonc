@@ -2,6 +2,12 @@
 	"name": "ayo",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-08-18",
+	"routes": [
+		{
+			"pattern": "ayo.oflabs.dev",
+			"custom_domain": true,
+		},
+	],
 	"observability": {
 		"enabled": true,
 	},
@@ -17,7 +23,7 @@
 	"kv_namespaces": [
 		{
 			"binding": "OAUTH_KV",
-			"id": "REPLACE_WITH_OAUTH_KV_NAMESPACE_ID",
+			"id": "9e30aafde1184b51bccfe38c52a850ec",
 		},
 	],
 	"worker_loaders": [
