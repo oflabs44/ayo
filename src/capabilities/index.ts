@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Env, OwnerProps } from "../env";
 import { meta } from "./meta";
+import { notebook } from "./notebook";
 
 export type CapabilityContext = {
 	env: Env;
@@ -23,6 +24,10 @@ export const capabilityRegistry = {
 	meta: {
 		description: "Capabilities for introspection and discovery",
 		capabilities: meta,
+	},
+	notebook: {
+		description: "Write, read, list, and delete private notebook pages",
+		capabilities: notebook,
 	},
 } satisfies Record<
 	string,
