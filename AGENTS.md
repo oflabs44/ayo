@@ -50,6 +50,14 @@ against those capabilities, instead of one MCP tool per capability.
   `https://<team>.cloudflareaccess.com/cdn-cgi/access/sso/oidc/<client-id>`).
 - The Access application callback URL is `https://<ayo-host>/oauth/callback`.
 
+## Conversation
+
+- `conversationId` is an application-level, honor-system relay: hosts reuse the
+  server-issued id across related tool calls; it is not an authentication or
+  isolation boundary.
+- Conversation suppression is stored in `OAUTH_KV` for
+  `SUPPRESSION_TTL_SECONDS` (six hours).
+
 ## Notebook
 
 - `NotebookStore` is the storage contract for private notebook pages; capability

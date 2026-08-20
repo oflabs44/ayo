@@ -2,47 +2,67 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { z } from "zod";
+import { mintConversationId } from "./conversation";
 import type { Env, OwnerProps } from "./env";
 import { executeCode } from "./execute";
 import { searchCapabilities } from "./search";
 
+const SERVER_INSTRUCTIONS =
+	"Ayo is your personal assistant. Use search to discover capabilities and execute to act through them. If you have a conversationId from an earlier result in the same conversation, pass it back unchanged. Otherwise omit conversationId and reuse the id returned by Ayo on later calls. Do not make one up.";
+const conversationIdInput = z.string().min(1).max(128).optional();
+
 function createServer(env: Env, props: OwnerProps): McpServer {
-	const server = new McpServer({ name: "ayo", version: "0.0.0" });
+	const server = new McpServer(
+		{ name: "ayo", version: "0.0.0" },
+		{ instructions: SERVER_INSTRUCTIONS },
+	);
 
 	server.registerTool(
 		"search",
 		{
 			description:
-				"Discover Ayo capabilities: blank query lists domains, normal text returns ranked matches, and an exact name or name:<capability> returns full details.",
-			inputSchema: { query: z.string() },
+				"Discover Ayo capabilities: blank query lists domains, normal text returns ranked matches, and an exact name or name:<capability> returns full details. Pass back a conversationId unchanged to echo it, or omit it to receive one.",
+			inputSchema: {
+				query: z.string(),
+				conversationId: conversationIdInput,
+			},
 		},
-		async ({ query }) => ({
-			content: [
-				{
-					type: "text",
-					text: JSON.stringify(await searchCapabilities(query, env)),
-				},
-			],
-		}),
+		async ({ query, conversationId: providedConversationId }) => {
+			const conversationId = providedConversationId ?? mintConversationId();
+			return {
+				content: [
+					{
+						type: "text",
+						text: JSON.stringify({
+							...(await searchCapabilities(query, env)),
+							conversationId,
+						}),
+					},
+				],
+			};
+		},
 	);
 
 	server.registerTool(
 		"execute",
 		{
 			description:
-				"Run JavaScript against Ayo capabilities through `ayo.<name>(input)`. The module must default-export a function. Put declarations inside that function: declarations above the default export can break codemode's wrapper. Outbound network access is blocked, `params` is available as a global object, and execution has a 30-second budget.",
+				"Run JavaScript against Ayo capabilities through `ayo.<name>(input)`. The module must default-export a function. Put declarations inside that function: declarations above the default export can break codemode's wrapper. Outbound network access is blocked, `params` is available as a global object, and execution has a 30-second budget. Pass back a conversationId unchanged to echo it, or omit it to receive one.",
 			inputSchema: {
 				code: z.string(),
 				params: z.record(z.string(), z.unknown()).optional(),
+				conversationId: conversationIdInput,
 			},
 		},
-		async ({ code, params }) => {
+		async ({ code, params, conversationId: providedConversationId }) => {
+			const conversationId = providedConversationId ?? mintConversationId();
 			const outcome = await executeCode({ code, params, env, props });
 			return {
 				content: [
 					{
 						type: "text" as const,
 						text: JSON.stringify({
+							conversationId,
 							result: outcome.result ?? null,
 							logs: outcome.logs,
 							...(outcome.error !== undefined

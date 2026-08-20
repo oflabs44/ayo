@@ -49,6 +49,26 @@ function mcpRequest(
 	});
 }
 
+async function callTool<Result>(
+	testEnv: Env,
+	headers: Record<string, string>,
+	name: string,
+	toolArguments: Record<string, unknown>,
+): Promise<{ status: number; isError?: boolean; result: Result }> {
+	const response = await dispatch(
+		mcpRequest(headers, "tools/call", { name, arguments: toolArguments }),
+		testEnv,
+	);
+	const body = (await response.json()) as {
+		result: { content: Array<{ text: string }>; isError?: boolean };
+	};
+	return {
+		status: response.status,
+		isError: body.result.isError,
+		result: JSON.parse(body.result.content[0].text) as Result,
+	};
+}
+
 function base64url(bytes: Uint8Array): string {
 	return btoa(String.fromCharCode(...bytes))
 		.replace(/\+/g, "-")
@@ -353,7 +373,7 @@ describe("OAuth-protected MCP worker", () => {
 		expect(nextResponse.status).toBe(200);
 	});
 
-	it("issues a token and serves tools/list and capability search", async () => {
+	it("issues a token and serves MCP tools with conversation identity", async () => {
 		const testEnv = createTestEnv("happy-path");
 		const login = await beginLogin(testEnv);
 		const completed = await completeLogin(
@@ -386,8 +406,31 @@ describe("OAuth-protected MCP worker", () => {
 		const token = (await tokenResponse.json()) as { access_token: string };
 		expect(tokenResponse.status).toBe(200);
 
+		const authorizationHeader = {
+			Authorization: `Bearer ${token.access_token}`,
+		};
+		const initializeResponse = await dispatch(
+			mcpRequest(authorizationHeader, "initialize", {
+				protocolVersion: "2025-06-18",
+				capabilities: {},
+				clientInfo: { name: "test-client", version: "1.0.0" },
+			}),
+			testEnv,
+		);
+		const initializeBody = (await initializeResponse.json()) as {
+			result: { instructions?: string };
+		};
+		expect(initializeResponse.status).toBe(200);
+		expect(initializeBody.result.instructions).toContain(
+			"Ayo is your personal assistant",
+		);
+		expect(initializeBody.result.instructions).toContain(
+			"pass it back unchanged",
+		);
+		expect(initializeBody.result.instructions).toContain("Do not make one up");
+
 		const mcpResponse = await dispatch(
-			mcpRequest({ Authorization: `Bearer ${token.access_token}` }),
+			mcpRequest(authorizationHeader),
 			testEnv,
 		);
 		const mcpBody = (await mcpResponse.json()) as {
@@ -399,25 +442,16 @@ describe("OAuth-protected MCP worker", () => {
 			"execute",
 		]);
 
-		const searchResponse = await dispatch(
-			mcpRequest(
-				{ Authorization: `Bearer ${token.access_token}` },
-				"tools/call",
-				{ name: "search", arguments: { query: "whoami" } },
-			),
-			testEnv,
-		);
-		const searchBody = (await searchResponse.json()) as {
-			result: { content: Array<{ text: string }> };
-		};
-		const searchResult = JSON.parse(searchBody.result.content[0].text) as {
+		const search = await callTool<{
+			conversationId: string;
 			capability: {
 				name: string;
 				inputSchema: Record<string, unknown>;
 			};
-		};
-		expect(searchResponse.status).toBe(200);
-		expect(searchResult.capability).toMatchObject({
+		}>(testEnv, authorizationHeader, "search", { query: "whoami" });
+		expect(search.status).toBe(200);
+		expect(search.result.conversationId).toEqual(expect.any(String));
+		expect(search.result.capability).toMatchObject({
 			name: "whoami",
 			inputSchema: {
 				type: "object",
@@ -426,33 +460,44 @@ describe("OAuth-protected MCP worker", () => {
 			},
 		});
 
-		const executeResponse = await dispatch(
-			mcpRequest(
-				{ Authorization: `Bearer ${token.access_token}` },
-				"tools/call",
-				{
-					name: "execute",
-					arguments: {
-						code: "export default async function main() {}",
-					},
-				},
-			),
+		const searchEcho = await callTool<{ conversationId: string }>(
 			testEnv,
+			authorizationHeader,
+			"search",
+			{ query: "whoami", conversationId: search.result.conversationId },
 		);
-		const executeBody = (await executeResponse.json()) as {
-			result: { content: Array<{ text: string }>; isError?: boolean };
-		};
-		const executeResult = JSON.parse(
-			executeBody.result.content[0].text,
-		) as Record<string, unknown>;
-		expect(executeResponse.status).toBe(200);
-		expect(executeBody.result.isError).toBe(true);
-		expect(executeResult).toEqual({
+		expect(searchEcho.result.conversationId).toBe(
+			search.result.conversationId,
+		);
+
+		const execute = await callTool<{ conversationId: string }>(
+			testEnv,
+			authorizationHeader,
+			"execute",
+			{ code: "export default async function main() {}" },
+		);
+		expect(execute.status).toBe(200);
+		expect(execute.isError).toBe(true);
+		expect(execute.result).toEqual({
+			conversationId: expect.any(String),
 			result: null,
 			logs: [],
 			error:
 				"The sandbox is unavailable: no LOADER binding. Capabilities cannot run.",
 		});
+
+		const executeEcho = await callTool<{ conversationId: string }>(
+			testEnv,
+			authorizationHeader,
+			"execute",
+			{
+				code: "export default async function main() {}",
+				conversationId: execute.result.conversationId,
+			},
+		);
+		expect(executeEcho.result.conversationId).toBe(
+			execute.result.conversationId,
+		);
 	});
 
 	it.each([
