@@ -24,6 +24,7 @@ function createTestEnv(label: string): Env {
 		ACCESS_OIDC_CLIENT_SECRET: "access-secret",
 		ACCESS_OIDC_ISSUER: `${ACCESS_ISSUER_BASE}/${label}-${issuerSequence}`,
 		OAUTH_KV: env.OAUTH_KV,
+		SEARCH_OFFLINE: "true",
 	} as Env;
 }
 

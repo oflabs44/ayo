@@ -1,9 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
+import type { Env } from "./env";
 import { searchCapabilities } from "./search";
 
-function createServer(): McpServer {
+function createServer(env: Env): McpServer {
 	const server = new McpServer({ name: "ayo", version: "0.0.0" });
 
 	server.registerTool(
@@ -17,7 +18,7 @@ function createServer(): McpServer {
 			content: [
 				{
 					type: "text",
-					text: JSON.stringify(searchCapabilities(query)),
+					text: JSON.stringify(await searchCapabilities(query, env)),
 				},
 			],
 		}),
@@ -47,7 +48,7 @@ function createServer(): McpServer {
 }
 
 export const mcpHandler = {
-	async fetch(request: Request): Promise<Response> {
+	async fetch(request: Request, env: Env): Promise<Response> {
 		const url = new URL(request.url);
 		if (url.pathname !== "/mcp") {
 			return new Response("Not found", { status: 404 });
@@ -60,7 +61,7 @@ export const mcpHandler = {
 			sessionIdGenerator: undefined,
 			enableJsonResponse: true,
 		});
-		const server = createServer();
+		const server = createServer(env);
 		await server.connect(transport);
 		return transport.handleRequest(request);
 	},

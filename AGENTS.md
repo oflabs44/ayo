@@ -28,8 +28,18 @@ against those capabilities, instead of one MCP tool per capability.
 
 ## Bindings and secrets
 
-- `OAUTH_KV` — KV namespace for OAuth clients, grants, and tokens; replace the
-  placeholder namespace ID in `wrangler.jsonc` before deployment.
+- `OAUTH_KV` — KV namespace for OAuth clients, grants, tokens, and the
+  `search:capabilities:content-stamp`; replace the placeholder namespace ID in
+  `wrangler.jsonc` before deployment.
+- `AI` — Workers AI binding for `@cf/baai/bge-small-en-v1.5` embeddings.
+- `VECTORIZE` — `ayo-search` Vectorize index. Create it with
+  `pnpm exec wrangler vectorize create ayo-search --dimensions=384 --metric=cosine`.
+  The model and its 384 dimensions are coupled to this index configuration.
+  Capability indexing is upsert-only, so renames leave stale vectors. A clean
+  rebuild requires recreating the index and clearing the capability content
+  stamp so the next semantic search repopulates it.
+- `SEARCH_OFFLINE=true` disables AI and Vectorize search; the development
+  script and test harness set it explicitly.
 - `ACCESS_OIDC_CLIENT_ID` — Access for SaaS OIDC client ID.
 - `ACCESS_OIDC_CLIENT_SECRET` — Access for SaaS OIDC client secret.
 - `ACCESS_OIDC_ISSUER` — Access for SaaS OIDC issuer, including the application

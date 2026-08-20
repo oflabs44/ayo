@@ -5,6 +5,15 @@
 	"observability": {
 		"enabled": true,
 	},
+	"ai": {
+		"binding": "AI",
+	},
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "ayo-search",
+		},
+	],
 	"kv_namespaces": [
 		{
 			"binding": "OAUTH_KV",

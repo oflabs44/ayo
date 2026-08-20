@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { Env } from "../src/env";
 import { searchCapabilities } from "../src/search";
 
+const offlineEnv = { SEARCH_OFFLINE: "true" } as Env;
+
 describe("capability search", () => {
-	it("returns a domain overview for a blank query", () => {
-		expect(searchCapabilities("  \n")).toEqual({
+	it("returns a domain overview for a blank query", async () => {
+		expect(await searchCapabilities("  \n", offlineEnv)).toEqual({
 			domains: [
 				{
 					domain: "meta",
@@ -14,8 +17,8 @@ describe("capability search", () => {
 		});
 	});
 
-	it("returns ranked matches for a normal query", () => {
-		expect(searchCapabilities("identity")).toMatchObject({
+	it("returns ranked matches for a normal query", async () => {
+		expect(await searchCapabilities("identity", offlineEnv)).toMatchObject({
 			matches: [
 				{
 					name: "whoami",
@@ -31,8 +34,10 @@ describe("capability search", () => {
 		});
 	});
 
-	it("returns full detail for an exact entity lookup", () => {
-		expect(searchCapabilities("name:capabilities_list")).toMatchObject({
+	it("returns full detail for an exact entity lookup", async () => {
+		expect(
+			await searchCapabilities("name:capabilities_list", offlineEnv),
+		).toMatchObject({
 			capability: {
 				name: "capabilities_list",
 				domain: "meta",
@@ -42,8 +47,42 @@ describe("capability search", () => {
 		});
 	});
 
-	it("orders keyword matches before description matches", () => {
-		const result = searchCapabilities("caller") as {
+	it("orders matches by weighted body and identity overlap", async () => {
+		const result = (await searchCapabilities(
+			"capabilities caller",
+			offlineEnv,
+		)) as { matches: Array<{ name: string }> };
+
+		expect(result.matches.map(({ name }) => name)).toEqual([
+			"capabilities_list",
+			"whoami",
+		]);
+	});
+
+	it("self-indexes and fuses mocked semantic results", async () => {
+		const aiRun = vi.fn(
+			async (_model: string, input: { text: string[] }) => ({
+				data: input.text.map(() => Array<number>(384).fill(0)),
+			}),
+		);
+		const upsert = vi.fn(async () => undefined);
+		const query = vi.fn(async () => ({
+			matches: [
+				{ id: "capability:capabilities_list", score: 0.9 },
+				{ id: "capability:whoami", score: 0.8 },
+			],
+		}));
+		const put = vi.fn(async () => undefined);
+		const onlineEnv = {
+			AI: { run: aiRun },
+			VECTORIZE: { upsert, query },
+			OAUTH_KV: {
+				get: vi.fn(async () => null),
+				put,
+			},
+		} as unknown as Env;
+
+		const result = (await searchCapabilities("profile", onlineEnv)) as {
 			matches: Array<{ name: string }>;
 		};
 
@@ -51,5 +90,40 @@ describe("capability search", () => {
 			"whoami",
 			"capabilities_list",
 		]);
+		expect(result).not.toHaveProperty("offline");
+		expect(aiRun).toHaveBeenCalledTimes(2);
+		expect(aiRun).toHaveBeenNthCalledWith(
+			1,
+			"@cf/baai/bge-small-en-v1.5",
+			{
+				text: [
+					expect.stringContaining("whoami\nmeta"),
+					expect.stringContaining("capabilities_list\nmeta"),
+				],
+			},
+		);
+		expect(aiRun).toHaveBeenNthCalledWith(
+			2,
+			"@cf/baai/bge-small-en-v1.5",
+			{ text: ["profile"] },
+		);
+		expect(upsert).toHaveBeenCalledWith([
+			expect.objectContaining({
+				id: "capability:whoami",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:capabilities_list",
+				namespace: "capabilities",
+			}),
+		]);
+		expect(query).toHaveBeenCalledWith(expect.any(Array), {
+			topK: 2,
+			namespace: "capabilities",
+		});
+		expect(put).toHaveBeenCalledWith(
+			"search:capabilities:content-stamp",
+			expect.any(String),
+		);
 	});
 });
