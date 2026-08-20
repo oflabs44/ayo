@@ -258,6 +258,42 @@ describe("OAuth-protected MCP worker", () => {
 		);
 	});
 
+	it("redirects canonical notebook links to Bureau", async () => {
+		const testEnv = createTestEnv("notebook-link");
+		const response = await dispatch(
+			new Request(`${ORIGIN}/notebook/memory/travel_preferences`),
+			testEnv,
+		);
+
+		expect(response.status).toBe(302);
+		expect(response.headers.get("Location")).toBe(
+			"https://bureau.oflabs.dev/notebook/memory/travel_preferences",
+		);
+	});
+
+	it.each([
+		["traversal", "/notebook/memory/%2e%2e%2fsecret"],
+		["invalid path", "/notebook/Memory/secret"],
+	])("returns the standard 404 body for a notebook %s", async (_name, path) => {
+		const response = await dispatch(
+			new Request(`${ORIGIN}${path}`),
+			createTestEnv(`notebook-${_name.replaceAll(" ", "-")}`),
+		);
+
+		expect(response.status).toBe(404);
+		await expect(response.text()).resolves.toBe("Not found");
+	});
+
+	it("keeps the standard 404 response for other unknown routes", async () => {
+		const response = await dispatch(
+			new Request(`${ORIGIN}/not-a-route`),
+			createTestEnv("unknown-route"),
+		);
+
+		expect(response.status).toBe(404);
+		await expect(response.text()).resolves.toBe("Not found");
+	});
+
 	it("serves protected-resource and authorization-server metadata", async () => {
 		const testEnv = createTestEnv("metadata");
 		const resourceResponse = await dispatch(

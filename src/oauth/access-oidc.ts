@@ -4,6 +4,8 @@ import {
 } from "@cloudflare/workers-oauth-provider";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { Env, OwnerProps } from "../env";
+import { bureauNotebookUrl } from "../notebook/links";
+import { isValidNotebookPath } from "../notebook/store";
 
 type ParkedAuthState = {
 	approvalNonce?: string;
@@ -20,6 +22,7 @@ const STATE_TTL_SECONDS = 600;
 const APPROVAL_COOKIE = "__Host-ayo-approval";
 const APPROVAL_PREFIX = "oauth:approved-client:";
 const APPROVAL_NONCE_PREFIX = "oauth:approval-nonce:";
+const NOTEBOOK_PATH_PREFIX = "/notebook/";
 
 function accessIssuer(env: Env): string {
 	return env.ACCESS_OIDC_ISSUER.replace(/\/+$/, "");
@@ -383,6 +386,15 @@ async function callback(request: Request, env: Env): Promise<Response> {
 export const accessHandler = {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const pathname = new URL(request.url).pathname;
+		if (pathname.startsWith(NOTEBOOK_PATH_PREFIX) && request.method === "GET") {
+			const path = pathname.slice(NOTEBOOK_PATH_PREFIX.length);
+			if (!isValidNotebookPath(path)) {
+				return new Response("Not found", { status: 404 });
+			}
+			// Bureau's Access app gates reads, so this blind redirect needs no local
+			// auth or store lookup.
+			return Response.redirect(bureauNotebookUrl(path), 302);
+		}
 		if (pathname === "/authorize" && request.method === "GET") {
 			return authorize(request, env);
 		}
