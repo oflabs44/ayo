@@ -91,3 +91,8 @@ Every new capability must ship with:
    until then, capabilities callable host-side only
 5. Notebook-first storage and capabilities, with memory following as the first
    section layered on the notebook
+
+## CI/CD
+
+Workers Builds deploys `main` on every push: build gate `pnpm test`, deploy
+`pnpm exec wrangler deploy`. Merging a PR into `main` is a production deploy.
