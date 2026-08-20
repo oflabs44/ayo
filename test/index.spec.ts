@@ -402,7 +402,7 @@ describe("OAuth-protected MCP worker", () => {
 			mcpRequest(
 				{ Authorization: `Bearer ${token.access_token}` },
 				"tools/call",
-				{ name: "search", arguments: { query: "WHO" } },
+				{ name: "search", arguments: { query: "whoami" } },
 			),
 			testEnv,
 		);
@@ -410,14 +410,13 @@ describe("OAuth-protected MCP worker", () => {
 			result: { content: Array<{ text: string }> };
 		};
 		const searchResult = JSON.parse(searchBody.result.content[0].text) as {
-			capabilities: Array<{
+			capability: {
 				name: string;
 				inputSchema: Record<string, unknown>;
-			}>;
+			};
 		};
 		expect(searchResponse.status).toBe(200);
-		expect(searchResult.capabilities).toHaveLength(1);
-		expect(searchResult.capabilities[0]).toMatchObject({
+		expect(searchResult.capability).toMatchObject({
 			name: "whoami",
 			inputSchema: {
 				type: "object",

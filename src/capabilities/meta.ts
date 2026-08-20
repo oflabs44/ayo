@@ -6,12 +6,14 @@ export const meta: Capability[] = [
 		name: "whoami",
 		description: "Return the OAuth properties of the current caller",
 		inputSchema: z.object({}),
+		keywords: ["identity", "profile", "oauth", "caller"],
 		handler: (_input, props) => props,
 	},
 	{
 		name: "capabilities_list",
-		description: "List all registered capabilities",
+		description: "List all capabilities available to the caller",
 		inputSchema: z.object({}),
+		keywords: ["capabilities", "discovery", "registry", "tools"],
 		handler: () =>
 			capabilities.map(({ name, description }) => ({ name, description })),
 	},

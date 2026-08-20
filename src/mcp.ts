@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
-import { capabilities } from "./capabilities/index";
+import { searchCapabilities } from "./search";
 
 function createServer(): McpServer {
 	const server = new McpServer({ name: "ayo", version: "0.0.0" });
@@ -9,33 +9,18 @@ function createServer(): McpServer {
 	server.registerTool(
 		"search",
 		{
-			description: "Search Ayo's capabilities",
+			description:
+				"Discover Ayo capabilities: blank query lists domains, normal text returns ranked matches, and an exact name or name:<capability> returns full details.",
 			inputSchema: { query: z.string() },
 		},
-		async ({ query }) => {
-			const normalizedQuery = query.toLowerCase();
-			const matches = capabilities
-				.filter(({ name, description, domain }) =>
-					[name, description, domain].some((value) =>
-						value.toLowerCase().includes(normalizedQuery),
-					),
-				)
-				.map(({ name, description, domain, inputSchema }) => ({
-					name,
-					description,
-					domain,
-					inputSchema: z.toJSONSchema(inputSchema),
-				}));
-
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify({ capabilities: matches }),
-					},
-				],
-			};
-		},
+		async ({ query }) => ({
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(searchCapabilities(query)),
+				},
+			],
+		}),
 	);
 
 	server.registerTool(

@@ -37,6 +37,18 @@ against those capabilities, instead of one MCP tool per capability.
   `https://<team>.cloudflareaccess.com/cdn-cgi/access/sso/oidc/<client-id>`).
 - The Access application callback URL is `https://<ayo-host>/oauth/callback`.
 
+## Capability authoring rule
+
+Search is the foundation: a capability the agent cannot find does not exist.
+Every new capability must ship with:
+
+- a `description` written in task language — how a person asks for it
+  mid-conversation ("Remember a fact about me"), not what it does internally
+  ("Upsert memory record")
+- a few `keywords` covering synonyms and task phrasings
+- two or three golden queries in the search test suite mapping realistic
+  phrasings to the capability
+
 ## Working style
 
 - Smallest coherent diff; no speculative abstractions or scaffolding.

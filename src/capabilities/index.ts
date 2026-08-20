@@ -5,6 +5,7 @@ export type Capability = {
 	name: string;
 	description: string;
 	inputSchema: z.ZodType;
+	keywords?: string[];
 	handler: (input: unknown, props: unknown) => unknown;
 };
 
@@ -12,10 +13,18 @@ export type RegisteredCapability = Capability & {
 	domain: string;
 };
 
-const capabilitiesByDomain = { meta } satisfies Record<string, Capability[]>;
+export const capabilityRegistry = {
+	meta: {
+		description: "Capabilities for introspection and discovery",
+		capabilities: meta,
+	},
+} satisfies Record<
+	string,
+	{ description: string; capabilities: Capability[] }
+>;
 
 export const capabilities: RegisteredCapability[] = Object.entries(
-	capabilitiesByDomain,
-).flatMap(([domain, entries]) =>
-	entries.map((entry) => ({ ...entry, domain })),
+	capabilityRegistry,
+).flatMap(([domain, group]) =>
+	group.capabilities.map((entry) => ({ ...entry, domain })),
 );
