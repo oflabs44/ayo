@@ -12,11 +12,20 @@ type OwnerProps = {
 };
 
 type ParkedAuthState = {
+	approvalNonce?: string;
 	request: AuthRequest;
 	verifier: string;
 };
 
+type PendingApproval = {
+	origin: string;
+	request: AuthRequest;
+};
+
 const STATE_TTL_SECONDS = 600;
+const APPROVAL_COOKIE = "__Host-ayo-approval";
+const APPROVAL_PREFIX = "oauth:approved-client:";
+const APPROVAL_NONCE_PREFIX = "oauth:approval-nonce:";
 
 function accessIssuer(env: Env): string {
 	return env.ACCESS_OIDC_ISSUER.replace(/\/+$/, "");
@@ -33,7 +42,34 @@ function base64url(bytes: Uint8Array): string {
 		.replace(/=+$/, "");
 }
 
-async function createState(request: AuthRequest, env: Env) {
+function escapeHtml(value: string): string {
+	return value.replace(
+		/[&<>"']/g,
+		(character) =>
+			({
+				"&": "&amp;",
+				"<": "&lt;",
+				">": "&gt;",
+				'"': "&quot;",
+				"'": "&#39;",
+			})[character]!,
+	);
+}
+
+function approvalCookie(request: Request): string | undefined {
+	return request.headers
+		.get("Cookie")
+		?.split(";")
+		.map((cookie) => cookie.trim())
+		.find((cookie) => cookie.startsWith(`${APPROVAL_COOKIE}=`))
+		?.slice(APPROVAL_COOKIE.length + 1);
+}
+
+async function createState(
+	request: AuthRequest,
+	env: Env,
+	approvalNonce?: string,
+) {
 	const state = base64url(crypto.getRandomValues(new Uint8Array(32)));
 	const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
 	const digest = await crypto.subtle.digest(
@@ -43,7 +79,7 @@ async function createState(request: AuthRequest, env: Env) {
 
 	await env.OAUTH_KV.put(
 		`oauth:state:${state}`,
-		JSON.stringify({ request, verifier }),
+		JSON.stringify({ approvalNonce, request, verifier } satisfies ParkedAuthState),
 		{ expirationTtl: STATE_TTL_SECONDS },
 	);
 
@@ -101,6 +137,80 @@ function authorizationErrorResponse(error: AuthorizationError): Response {
 	return Response.redirect(redirect, 302);
 }
 
+async function redirectToAccess(
+	oauthRequest: AuthRequest,
+	origin: string,
+	env: Env,
+	approvalNonce?: string,
+): Promise<Response> {
+	const { state, challenge } = await createState(
+		oauthRequest,
+		env,
+		approvalNonce,
+	);
+	const upstream = accessEndpoint(env, "authorization");
+	upstream.searchParams.set("client_id", env.ACCESS_OIDC_CLIENT_ID);
+	upstream.searchParams.set(
+		"redirect_uri",
+		new URL("/oauth/callback", origin).href,
+	);
+	upstream.searchParams.set("response_type", "code");
+	upstream.searchParams.set("scope", "openid email");
+	upstream.searchParams.set("state", state);
+	upstream.searchParams.set("code_challenge", challenge);
+	upstream.searchParams.set("code_challenge_method", "S256");
+
+	return Response.redirect(upstream, 302);
+}
+
+async function approvalPage(
+	oauthRequest: AuthRequest,
+	origin: string,
+	env: Env,
+): Promise<Response> {
+	const client = await env.OAUTH_PROVIDER.lookupClient(oauthRequest.clientId);
+	if (!client) {
+		return new Response("Unknown OAuth client", { status: 400 });
+	}
+
+	const nonce = base64url(crypto.getRandomValues(new Uint8Array(32)));
+	await env.OAUTH_KV.put(
+		`${APPROVAL_NONCE_PREFIX}${nonce}`,
+		JSON.stringify({ origin, request: oauthRequest } satisfies PendingApproval),
+		{ expirationTtl: STATE_TTL_SECONDS },
+	);
+
+	return new Response(
+		`<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Approve OAuth client</title></head>
+<body>
+<main>
+<h1>Approve OAuth client?</h1>
+<dl>
+<dt>Client</dt><dd>${escapeHtml(client.clientName ?? oauthRequest.clientId)}</dd>
+<dt>Redirect URI</dt><dd>${escapeHtml(oauthRequest.redirectUri)}</dd>
+</dl>
+<form method="post" action="/authorize">
+<input type="hidden" name="nonce" value="${nonce}">
+<button type="submit">Approve</button>
+</form>
+</main>
+</body>
+</html>`,
+		{
+			headers: {
+				"Cache-Control": "no-store",
+				"Content-Security-Policy":
+					"default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+				"Content-Type": "text/html; charset=utf-8",
+				"Set-Cookie": `${APPROVAL_COOKIE}=${nonce}; Path=/; Max-Age=${STATE_TTL_SECONDS}; Secure; HttpOnly; SameSite=Lax`,
+				"X-Frame-Options": "DENY",
+			},
+		},
+	);
+}
+
 async function authorize(request: Request, env: Env): Promise<Response> {
 	let oauthRequest: AuthRequest;
 	try {
@@ -112,20 +222,50 @@ async function authorize(request: Request, env: Env): Promise<Response> {
 		throw error;
 	}
 
-	const { state, challenge } = await createState(oauthRequest, env);
-	const upstream = accessEndpoint(env, "authorization");
-	upstream.searchParams.set("client_id", env.ACCESS_OIDC_CLIENT_ID);
-	upstream.searchParams.set(
-		"redirect_uri",
-		new URL("/oauth/callback", request.url).href,
+	const origin = new URL(request.url).origin;
+	const approved = await env.OAUTH_KV.get(
+		`${APPROVAL_PREFIX}${oauthRequest.clientId}`,
 	);
-	upstream.searchParams.set("response_type", "code");
-	upstream.searchParams.set("scope", "openid email");
-	upstream.searchParams.set("state", state);
-	upstream.searchParams.set("code_challenge", challenge);
-	upstream.searchParams.set("code_challenge_method", "S256");
+	if (approved) {
+		return redirectToAccess(oauthRequest, origin, env);
+	}
+	return approvalPage(oauthRequest, origin, env);
+}
 
-	return Response.redirect(upstream, 302);
+async function approve(request: Request, env: Env): Promise<Response> {
+	const nonce = await request
+		.formData()
+		.then((form) => form.get("nonce"))
+		.catch((error: unknown) => {
+			console.error("Approval form parse failed", {
+				reason: error instanceof Error ? error.message : String(error),
+			});
+			return null;
+		});
+	if (typeof nonce !== "string" || approvalCookie(request) !== nonce) {
+		console.error("Approval rejected", {
+			reason:
+				typeof nonce !== "string" ? "missing nonce field" : "cookie mismatch",
+		});
+		return new Response(
+			"Approval expired or was superseded - restart the sign-in from your client",
+			{ status: 400 },
+		);
+	}
+
+	const key = `${APPROVAL_NONCE_PREFIX}${nonce}`;
+	const stored = await env.OAUTH_KV.get(key);
+	if (!stored) {
+		return new Response("Invalid or expired approval", { status: 400 });
+	}
+	await env.OAUTH_KV.delete(key);
+
+	const pending = JSON.parse(stored) as PendingApproval;
+	if (pending.origin !== new URL(request.url).origin) {
+		return new Response("Invalid approval origin", { status: 400 });
+	}
+
+	return redirectToAccess(pending.request, pending.origin, env, nonce);
 }
 
 async function callback(request: Request, env: Env): Promise<Response> {
@@ -133,6 +273,18 @@ async function callback(request: Request, env: Env): Promise<Response> {
 	const parked = await readState(url, env);
 	if (!parked) {
 		return new Response("Invalid or expired state", { status: 400 });
+	}
+	if (
+		parked.approvalNonce &&
+		approvalCookie(request) !== parked.approvalNonce
+	) {
+		console.error("Callback approval cookie mismatch", {
+			clientId: parked.request.clientId,
+		});
+		return new Response(
+			"Approval browser does not match - restart the sign-in from your client",
+			{ status: 400 },
+		);
 	}
 
 	const code = url.searchParams.get("code");
@@ -200,7 +352,11 @@ async function callback(request: Request, env: Env): Promise<Response> {
 		return new Response("Could not verify the Access ID token", { status: 502 });
 	}
 
-	if (!claims.email || !claims.sub) {
+	if (typeof claims.email !== "string" || typeof claims.sub !== "string") {
+		console.error("Access ID token missing identity claims", {
+			hasEmail: typeof claims.email === "string",
+			hasSub: typeof claims.sub === "string",
+		});
 		return new Response("Access returned an incomplete identity", { status: 502 });
 	}
 
@@ -217,6 +373,13 @@ async function callback(request: Request, env: Env): Promise<Response> {
 		} satisfies OwnerProps,
 	});
 
+	if (parked.approvalNonce) {
+		await env.OAUTH_KV.put(
+			`${APPROVAL_PREFIX}${parked.request.clientId}`,
+			"approved",
+		);
+	}
+
 	return Response.redirect(redirectTo, 302);
 }
 
@@ -225,6 +388,9 @@ export const accessHandler = {
 		const pathname = new URL(request.url).pathname;
 		if (pathname === "/authorize" && request.method === "GET") {
 			return authorize(request, env);
+		}
+		if (pathname === "/authorize" && request.method === "POST") {
+			return approve(request, env);
 		}
 		if (pathname === "/oauth/callback" && request.method === "GET") {
 			return callback(request, env);
