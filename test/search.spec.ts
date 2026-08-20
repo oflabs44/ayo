@@ -24,6 +24,15 @@ describe("capability search", () => {
 						"notebook_history",
 					],
 				},
+				{
+					domain: "memory",
+					description: "Remember, recall, and forget facts about the owner",
+					capabilities: [
+						"memory_remember",
+						"memory_recall",
+						"memory_forget",
+					],
+				},
 			],
 		});
 	});
@@ -115,6 +124,9 @@ describe("capability search", () => {
 					expect.stringContaining("notebook_list\nnotebook"),
 					expect.stringContaining("notebook_delete\nnotebook"),
 					expect.stringContaining("notebook_history\nnotebook"),
+					expect.stringContaining("memory_remember\nmemory"),
+					expect.stringContaining("memory_recall\nmemory"),
+					expect.stringContaining("memory_forget\nmemory"),
 				],
 			},
 		);
@@ -152,9 +164,21 @@ describe("capability search", () => {
 				id: "capability:notebook_history",
 				namespace: "capabilities",
 			}),
+			expect.objectContaining({
+				id: "capability:memory_remember",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:memory_recall",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:memory_forget",
+				namespace: "capabilities",
+			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 7,
+			topK: 10,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(

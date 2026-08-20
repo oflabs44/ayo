@@ -22,6 +22,12 @@ const goldenQueries = [
 	["remove that notebook page", "notebook_delete"],
 	["what did the brief say before", "notebook_history"],
 	["show the page history", "notebook_history"],
+	["remember that i prefer aisle seats", "memory_remember"],
+	["save my dietary preference for later", "memory_remember"],
+	["what do you know about my travel preferences", "memory_recall"],
+	["recall my seat preference", "memory_recall"],
+	["forget what i said about aisle seats", "memory_forget"],
+	["remove this fact from memory", "memory_forget"],
 ] as const;
 
 describe("capability search golden queries", () => {

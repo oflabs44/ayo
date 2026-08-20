@@ -5,7 +5,7 @@ import {
 	EMBEDDING_MAX_INPUT_CHARS,
 	identityBodyScore,
 	RRF_CONSTANT,
-} from "../search";
+} from "../search-support";
 
 export const MEMORY_INDEX_STATE_KEY = "memory:index-state";
 const MEMORY_NAMESPACE = "memories";
@@ -44,6 +44,22 @@ function parseIndexState(value: string | null): MemoryIndexState {
 	} catch {
 		return {};
 	}
+}
+
+export async function removeMemoryFromIndex(
+	env: Env,
+	path: string,
+): Promise<void> {
+	if (env.VECTORIZE) {
+		await env.VECTORIZE.deleteByIds([path]);
+	}
+
+	const state = parseIndexState(
+		await env.OAUTH_KV.get(MEMORY_INDEX_STATE_KEY),
+	);
+	if (!(path in state)) return;
+	delete state[path];
+	await env.OAUTH_KV.put(MEMORY_INDEX_STATE_KEY, JSON.stringify(state));
 }
 
 export async function syncMemoryIndex(
