@@ -43,6 +43,8 @@ against those capabilities, instead of one MCP tool per capability.
 - `LOADER` — Worker Loader binding used by `@cloudflare/codemode` to create a
   fresh Dynamic Worker for each execute call. Dynamic Workers are available in
   open beta on the Workers paid plan.
+- `BUREAU` — service binding to the `BureauRpc` entrypoint on the `bureau`
+  Worker, used as the production notebook backend.
 - `ACCESS_OIDC_CLIENT_ID` — Access for SaaS OIDC client ID.
 - `ACCESS_OIDC_CLIENT_SECRET` — Access for SaaS OIDC client secret.
 - `ACCESS_OIDC_ISSUER` — Access for SaaS OIDC issuer, including the application
@@ -66,8 +68,8 @@ against those capabilities, instead of one MCP tool per capability.
   segment-aware recursive listing with ordering and limits.
 - `src/notebook/links.ts` is the authority for canonical notebook links under
   `https://ayo.oflabs.dev/notebook/`.
-- No production notebook backend exists yet. Capabilities return a structured
-  not-configured result until the pending Bureau/GitHub backend is wired.
+- `src/notebook/bureau-store.ts` adapts Bureau's `BureauRpc` notebook methods to
+  `NotebookStore`. The test override remains first in backend resolution.
 
 ## Capability authoring rule
 

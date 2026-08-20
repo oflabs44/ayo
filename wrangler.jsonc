@@ -31,4 +31,11 @@
 			"binding": "LOADER",
 		},
 	],
+	"services": [
+		{
+			"binding": "BUREAU",
+			"service": "bureau",
+			"entrypoint": "BureauRpc",
+		},
+	],
 }
