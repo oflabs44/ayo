@@ -1,12 +1,18 @@
 import { z } from "zod";
+import type { Env, OwnerProps } from "../env";
 import { meta } from "./meta";
+
+export type CapabilityContext = {
+	env: Env;
+	props: OwnerProps;
+};
 
 export type Capability = {
 	name: string;
 	description: string;
 	inputSchema: z.ZodType;
 	keywords?: string[];
-	handler: (input: unknown, props: unknown) => unknown;
+	handler: (input: unknown, ctx: CapabilityContext) => unknown;
 };
 
 export type RegisteredCapability = Capability & {

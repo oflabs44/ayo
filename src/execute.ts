@@ -36,7 +36,7 @@ export async function executeCode(input: {
 		const outcome = await executor.execute(input.code, [
 			{
 				name: "ayo",
-				fns: buildDispatchTable(capabilities, input.props),
+				fns: buildDispatchTable(capabilities, input.env, input.props),
 				prelude: `const params = ${JSON.stringify(input.params ?? {})};`,
 			},
 		]);
@@ -63,6 +63,7 @@ export async function executeCode(input: {
 
 export function buildDispatchTable(
 	registry: Capability[],
+	env: Env,
 	props: OwnerProps,
 ): Record<string, (input: unknown) => Promise<unknown>> {
 	return Object.fromEntries(
@@ -71,7 +72,7 @@ export function buildDispatchTable(
 			async (input: unknown) => {
 				try {
 					const parsedInput = capability.inputSchema.parse(input);
-					return await capability.handler(parsedInput, props);
+					return await capability.handler(parsedInput, { env, props });
 				} catch (error) {
 					// The RPC boundary reduces this to a message, so log while the stack exists.
 					console.error(
