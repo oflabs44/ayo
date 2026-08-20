@@ -195,8 +195,11 @@ async function approvalPage(
 		{
 			headers: {
 				"Cache-Control": "no-store",
+				// form-action governs the redirect chain of the form submission in
+				// Chrome, and approving 302s to Access — so its origin must be
+				// allowed or the browser silently blocks the navigation.
 				"Content-Security-Policy":
-					"default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+					`default-src 'none'; form-action 'self' ${new URL(accessIssuer(env)).origin}; frame-ancestors 'none'; base-uri 'none'`,
 				"Content-Type": "text/html; charset=utf-8",
 				"Set-Cookie": `${APPROVAL_COOKIE}=${nonce}; Path=/; Max-Age=${STATE_TTL_SECONDS}; Secure; HttpOnly; SameSite=Lax`,
 				"X-Frame-Options": "DENY",
