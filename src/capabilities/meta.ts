@@ -15,14 +15,14 @@ export const meta: Capability[] = [
 			"account",
 			"signed in",
 		],
-		handler: (_input, props) => props,
+		handler: (_input, { props }) => props,
 	},
 	{
 		name: "capabilities_list",
 		description: "List all capabilities available to the caller",
 		inputSchema: z.object({}),
 		keywords: ["capabilities", "discovery", "registry", "tools"],
-		handler: () =>
+		handler: (_input, _ctx) =>
 			capabilities.map(({ name, description }) => ({ name, description })),
 	},
 ];

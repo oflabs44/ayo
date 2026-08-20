@@ -13,6 +13,7 @@ const props: OwnerProps = {
 	name: "Oladayo",
 	sub: "ayo-owner",
 };
+const testEnv = {} as Env;
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -21,7 +22,7 @@ describe("execute sandbox", () => {
 		await expect(
 			executeCode({
 				code: "export default async function main() {}",
-				env: {} as Env,
+				env: testEnv,
 				props,
 			}),
 		).resolves.toEqual({
@@ -40,7 +41,7 @@ describe("execute sandbox", () => {
 
 describe("execute dispatch table", () => {
 	it("passes caller OAuth properties to whoami", async () => {
-		const dispatch = buildDispatchTable(capabilities, props);
+		const dispatch = buildDispatchTable(capabilities, testEnv, props);
 
 		await expect(dispatch.whoami!({})).resolves.toEqual(props);
 	});
@@ -54,7 +55,7 @@ describe("execute dispatch table", () => {
 			inputSchema: z.object({ count: z.number() }),
 			handler,
 		};
-		const dispatch = buildDispatchTable([capability], props);
+		const dispatch = buildDispatchTable([capability], testEnv, props);
 
 		await expect(
 			dispatch.requires_count!({ count: "not a number" }),
@@ -75,7 +76,7 @@ describe("execute dispatch table", () => {
 				throw error;
 			},
 		};
-		const dispatch = buildDispatchTable([capability], props);
+		const dispatch = buildDispatchTable([capability], testEnv, props);
 
 		await expect(dispatch.throws!({})).rejects.toBe(error);
 		expect(consoleError).toHaveBeenCalledWith(

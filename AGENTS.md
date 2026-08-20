@@ -50,6 +50,17 @@ against those capabilities, instead of one MCP tool per capability.
   `https://<team>.cloudflareaccess.com/cdn-cgi/access/sso/oidc/<client-id>`).
 - The Access application callback URL is `https://<ayo-host>/oauth/callback`.
 
+## Notebook
+
+- `NotebookStore` is the storage contract for private notebook pages; capability
+  code depends on this interface, not a backend implementation. Contract v2
+  retains revisions, supports versioned reads and history, and provides
+  segment-aware recursive listing with ordering and limits.
+- `src/notebook/links.ts` is the authority for canonical notebook links under
+  `https://ayo.oflabs.dev/notebook/`.
+- No production notebook backend exists yet. Capabilities return a structured
+  not-configured result until the pending Bureau/GitHub backend is wired.
+
 ## Capability authoring rule
 
 Search is the foundation: a capability the agent cannot find does not exist.
@@ -78,4 +89,5 @@ Every new capability must ship with:
 3. Capability registry as plain typed modules (domain → capabilities)
 4. Sandboxed `execute` via Dynamic Workers (Worker Loader) once access exists;
    until then, capabilities callable host-side only
-5. Memory capabilities (the Jerry redo) on D1
+5. Notebook-first storage and capabilities, with memory following as the first
+   section layered on the notebook

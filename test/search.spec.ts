@@ -13,6 +13,17 @@ describe("capability search", () => {
 					description: "Capabilities for introspection and discovery",
 					capabilities: ["whoami", "capabilities_list"],
 				},
+				{
+					domain: "notebook",
+					description: "Write, read, list, and delete private notebook pages",
+					capabilities: [
+						"notebook_write",
+						"notebook_read",
+						"notebook_list",
+						"notebook_delete",
+						"notebook_history",
+					],
+				},
 			],
 		});
 	});
@@ -99,6 +110,11 @@ describe("capability search", () => {
 				text: [
 					expect.stringContaining("whoami\nmeta"),
 					expect.stringContaining("capabilities_list\nmeta"),
+					expect.stringContaining("notebook_write\nnotebook"),
+					expect.stringContaining("notebook_read\nnotebook"),
+					expect.stringContaining("notebook_list\nnotebook"),
+					expect.stringContaining("notebook_delete\nnotebook"),
+					expect.stringContaining("notebook_history\nnotebook"),
 				],
 			},
 		);
@@ -116,9 +132,29 @@ describe("capability search", () => {
 				id: "capability:capabilities_list",
 				namespace: "capabilities",
 			}),
+			expect.objectContaining({
+				id: "capability:notebook_write",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:notebook_read",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:notebook_list",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:notebook_delete",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:notebook_history",
+				namespace: "capabilities",
+			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 2,
+			topK: 7,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(

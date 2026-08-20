@@ -1,4 +1,5 @@
 import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
+import type { NotebookStore } from "./notebook/store";
 
 type AiBinding = {
 	run(
@@ -29,6 +30,7 @@ export type Env = {
 	ACCESS_OIDC_ISSUER: string;
 	AI?: AiBinding;
 	LOADER?: WorkerLoader;
+	NOTEBOOK_STORE_FOR_TESTS?: NotebookStore;
 	OAUTH_KV: KVNamespace;
 	OAUTH_PROVIDER: OAuthHelpers;
 	SEARCH_OFFLINE?: string;
