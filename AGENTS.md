@@ -40,6 +40,9 @@ against those capabilities, instead of one MCP tool per capability.
   stamp so the next semantic search repopulates it.
 - `SEARCH_OFFLINE=true` disables AI and Vectorize search; the development
   script and test harness set it explicitly.
+- `LOADER` — Worker Loader binding used by `@cloudflare/codemode` to create a
+  fresh Dynamic Worker for each execute call. Dynamic Workers are available in
+  open beta on the Workers paid plan.
 - `ACCESS_OIDC_CLIENT_ID` — Access for SaaS OIDC client ID.
 - `ACCESS_OIDC_CLIENT_SECRET` — Access for SaaS OIDC client secret.
 - `ACCESS_OIDC_ISSUER` — Access for SaaS OIDC issuer, including the application

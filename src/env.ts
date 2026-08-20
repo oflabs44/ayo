@@ -17,11 +17,18 @@ type VectorizeBinding = {
 	): Promise<{ matches: Array<{ id: string; score: number }> }>;
 };
 
+export type OwnerProps = {
+	email: string;
+	name: string;
+	sub: string;
+};
+
 export type Env = {
 	ACCESS_OIDC_CLIENT_ID: string;
 	ACCESS_OIDC_CLIENT_SECRET: string;
 	ACCESS_OIDC_ISSUER: string;
 	AI?: AiBinding;
+	LOADER?: WorkerLoader;
 	OAUTH_KV: KVNamespace;
 	OAUTH_PROVIDER: OAuthHelpers;
 	SEARCH_OFFLINE?: string;

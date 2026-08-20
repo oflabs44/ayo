@@ -425,6 +425,34 @@ describe("OAuth-protected MCP worker", () => {
 				additionalProperties: false,
 			},
 		});
+
+		const executeResponse = await dispatch(
+			mcpRequest(
+				{ Authorization: `Bearer ${token.access_token}` },
+				"tools/call",
+				{
+					name: "execute",
+					arguments: {
+						code: "export default async function main() {}",
+					},
+				},
+			),
+			testEnv,
+		);
+		const executeBody = (await executeResponse.json()) as {
+			result: { content: Array<{ text: string }>; isError?: boolean };
+		};
+		const executeResult = JSON.parse(
+			executeBody.result.content[0].text,
+		) as Record<string, unknown>;
+		expect(executeResponse.status).toBe(200);
+		expect(executeBody.result.isError).toBe(true);
+		expect(executeResult).toEqual({
+			result: null,
+			logs: [],
+			error:
+				"The sandbox is unavailable: no LOADER binding. Capabilities cannot run.",
+		});
 	});
 
 	it.each([

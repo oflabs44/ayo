@@ -3,13 +3,7 @@ import {
 	type AuthRequest,
 } from "@cloudflare/workers-oauth-provider";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import type { Env } from "../env";
-
-type OwnerProps = {
-	email: string;
-	name: string;
-	sub: string;
-};
+import type { Env, OwnerProps } from "../env";
 
 type ParkedAuthState = {
 	approvalNonce?: string;

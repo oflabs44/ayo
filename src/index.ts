@@ -1,11 +1,11 @@
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import type { Env } from "./env";
-import { mcpHandler } from "./mcp";
+import { McpHandler } from "./mcp";
 import { accessHandler } from "./oauth/access-oidc";
 
 export default new OAuthProvider<Env>({
 	apiRoute: "/mcp",
-	apiHandler: mcpHandler,
+	apiHandler: McpHandler,
 	defaultHandler: accessHandler,
 	authorizeEndpoint: "/authorize",
 	tokenEndpoint: "/oauth/token",

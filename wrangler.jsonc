@@ -20,4 +20,9 @@
 			"id": "REPLACE_WITH_OAUTH_KV_NAMESPACE_ID",
 		},
 	],
+	"worker_loaders": [
+		{
+			"binding": "LOADER",
+		},
+	],
 }
