@@ -17,7 +17,29 @@ export interface NotebookStore {
 		path: string,
 		input: { content: string; title?: string },
 	): Promise<NotebookDoc>;
-	read(path: string): Promise<NotebookDoc | null>;
-	list(prefix?: string): Promise<NotebookDocMeta[]>;
-	delete(path: string): Promise<void>;
+	read(path: string, opts?: { version?: string }): Promise<NotebookDoc | null>;
+	history(path: string): Promise<Array<{ version: string; updatedAt: string }>>;
+	list(query?: {
+		prefix?: string;
+		recursive?: boolean;
+		orderBy?: "path" | "updatedAt";
+		limit?: number;
+	}): Promise<NotebookDocMeta[]>;
+	/** Returns whether a document existed at the path and was removed. */
+	delete(path: string): Promise<boolean>;
+}
+
+const VALID_PATH = /^[a-z0-9_./-]+$/;
+
+/** Single authority for notebook path validity, shared by stores and schemas. */
+export function isValidNotebookPath(path: string): boolean {
+	return (
+		path.length > 0 &&
+		!path.startsWith("/") &&
+		!path.endsWith("/") &&
+		VALID_PATH.test(path) &&
+		path
+			.split("/")
+			.every((segment) => segment !== "" && segment !== "." && segment !== "..")
+	);
 }

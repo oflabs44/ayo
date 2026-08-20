@@ -21,6 +21,7 @@ describe("capability search", () => {
 						"notebook_read",
 						"notebook_list",
 						"notebook_delete",
+						"notebook_history",
 					],
 				},
 			],
@@ -113,6 +114,7 @@ describe("capability search", () => {
 					expect.stringContaining("notebook_read\nnotebook"),
 					expect.stringContaining("notebook_list\nnotebook"),
 					expect.stringContaining("notebook_delete\nnotebook"),
+					expect.stringContaining("notebook_history\nnotebook"),
 				],
 			},
 		);
@@ -146,9 +148,13 @@ describe("capability search", () => {
 				id: "capability:notebook_delete",
 				namespace: "capabilities",
 			}),
+			expect.objectContaining({
+				id: "capability:notebook_history",
+				namespace: "capabilities",
+			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 6,
+			topK: 7,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(

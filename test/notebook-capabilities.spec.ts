@@ -50,6 +50,32 @@ describe("notebook capabilities", () => {
 		});
 	});
 
+	it("reads a previous version and lists page history", async () => {
+		const { dispatch } = createDispatch();
+		const first = (await dispatch.notebook_write!({
+			path: "briefs/versioned",
+			content: "First",
+		})) as { version: string };
+		const second = (await dispatch.notebook_write!({
+			path: "briefs/versioned",
+			content: "Second",
+		})) as { version: string };
+
+		const old = await dispatch.notebook_read!({
+			path: "briefs/versioned",
+			version: first.version,
+		});
+		const history = await dispatch.notebook_history!({
+			path: "briefs/versioned",
+		});
+
+		expect(old).toMatchObject({ content: "First", version: first.version });
+		expect(history).toEqual([
+			expect.objectContaining({ version: second.version }),
+			expect.objectContaining({ version: first.version }),
+		]);
+	});
+
 	it("lists pages under a prefix with canonical URLs", async () => {
 		const { dispatch } = createDispatch();
 		await dispatch.notebook_write!({ path: "notes/z-last", content: "Z" });
@@ -75,6 +101,25 @@ describe("notebook capabilities", () => {
 		expect(listed.every((doc) => !("content" in doc))).toBe(true);
 	});
 
+	it("passes richer list options to the store", async () => {
+		const { dispatch } = createDispatch();
+		await dispatch.notebook_write!({ path: "notes/older", content: "Old" });
+		await dispatch.notebook_write!({ path: "notes/newer", content: "New" });
+		await dispatch.notebook_write!({
+			path: "notes/2026/nested",
+			content: "Nested",
+		});
+
+		const listed = (await dispatch.notebook_list!({
+			prefix: "notes",
+			recursive: false,
+			orderBy: "updatedAt",
+			limit: 1,
+		})) as Array<{ path: string }>;
+
+		expect(listed.map(({ path }) => path)).toEqual(["notes/newer"]);
+	});
+
 	it("deletes a page", async () => {
 		const { dispatch } = createDispatch();
 		await dispatch.notebook_write!({ path: "notes/delete-me", content: "Gone" });
@@ -92,6 +137,7 @@ describe("notebook capabilities", () => {
 		["notebook_read", { path: "notes/new" }],
 		["notebook_list", {}],
 		["notebook_delete", { path: "notes/new" }],
+		["notebook_history", { path: "notes/new" }],
 	] as const)("returns a structured error from %s without a backend", async (name, input) => {
 		const dispatch = buildDispatchTable(notebook, {} as Env, props);
 

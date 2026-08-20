@@ -53,7 +53,9 @@ against those capabilities, instead of one MCP tool per capability.
 ## Notebook
 
 - `NotebookStore` is the storage contract for private notebook pages; capability
-  code depends on this interface, not a backend implementation.
+  code depends on this interface, not a backend implementation. Contract v2
+  retains revisions, supports versioned reads and history, and provides
+  segment-aware recursive listing with ordering and limits.
 - `src/notebook/links.ts` is the authority for canonical notebook links under
   `https://ayo.oflabs.dev/notebook/`.
 - No production notebook backend exists yet. Capabilities return a structured

@@ -17,8 +17,11 @@ const goldenQueries = [
 	["open a notebook page", "notebook_read"],
 	["show me my notes", "notebook_list"],
 	["list all notebook pages", "notebook_list"],
+	["recent notes", "notebook_list"],
 	["delete this notebook page", "notebook_delete"],
 	["remove that notebook page", "notebook_delete"],
+	["what did the brief say before", "notebook_history"],
+	["show the page history", "notebook_history"],
 ] as const;
 
 describe("capability search golden queries", () => {
