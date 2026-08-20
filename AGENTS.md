@@ -10,21 +10,35 @@ against those capabilities, instead of one MCP tool per capability.
 ## Decisions (do not relitigate without asking)
 
 - Single user. No multi-tenancy, no per-user isolation layers, no signup.
-  Auth starts as a static bearer secret (step 1) and moves to OAuth-issued
-  tokens (step 2); the bearer check on `/mcp` stays the validation core.
+  Auth is OAuth: Ayo is the OAuth server to MCP hosts (dynamic registration,
+  consent gate) and an OAuth client of a Cloudflare Access OIDC app for the
+  login itself.
 - Two-tool MCP surface: `search` + `execute`. No static tool catalog.
 - One Worker, one repo, no monorepo. Split only when a second deploy unit
   actually exists.
 - Package manager: pnpm. Never npm.
 - Scaffolded with create-cloudflare (Hello World / Worker only / TypeScript).
+- The notebook backend is Bureau (service binding); capability code only ever
+  sees the `NotebookStore` interface. Canonical links are Ayo-owned.
 
 ## Layout
 
 - `src/index.ts` — Worker entrypoint and OAuth provider wiring
-- `src/mcp.ts` — MCP server and transport
-- `src/oauth/` — Cloudflare Access OIDC login flow
+- `src/mcp.ts` — MCP server, transport, conversationId/memoryContext relay
+- `src/oauth/` — Cloudflare Access OIDC login flow, consent gate, and the
+  `/notebook/*` canonical-link redirect
+- `src/capabilities/` — the registry: one file per domain (`meta`, `notebook`,
+  `memory`), keyed and flattened in `index.ts`
+- `src/search.ts` — search modes, lexical scoring, embeddings, RRF fusion
+- `src/execute.ts` — codemode sandbox and the `ayo.*` dispatch table
+- `src/notebook/` — `NotebookStore` contract, in-memory reference store,
+  Bureau RPC adapter, link authority
+- `src/memory/` — memory index (self-healing embeddings), recall, ambient
+  surfacing
+- `src/conversation.ts` — conversationId minting and KV suppression
 - `wrangler.jsonc` — Worker config
-- `test/` — Vitest with `@cloudflare/vitest-pool-workers`
+- `test/` — Vitest with `@cloudflare/vitest-pool-workers`; golden queries and
+  the interface-driven store suite live here
 
 ## Bindings and secrets
 
@@ -32,7 +46,8 @@ against those capabilities, instead of one MCP tool per capability.
   `search:capabilities:content-stamp`; replace the placeholder namespace ID in
   `wrangler.jsonc` before deployment.
 - `AI` — Workers AI binding for `@cf/baai/bge-small-en-v1.5` embeddings.
-- `VECTORIZE` — `ayo-search` Vectorize index. Create it with
+- `VECTORIZE` — `ayo-search` Vectorize index (namespaces: `capabilities` for
+  search, `memories` for memory recall). Create it with
   `pnpm exec wrangler vectorize create ayo-search --dimensions=384 --metric=cosine`.
   The model and its 384 dimensions are coupled to this index configuration.
   Capability indexing is upsert-only, so renames leave stale vectors. A clean
@@ -92,17 +107,24 @@ Every new capability must ship with:
 - Check current Cloudflare docs before using platform APIs; do not assume.
 - Run `pnpm test` before committing.
 
-## Roadmap (v1)
+## Memory
 
-1. MCP endpoint at `/mcp` with `search` and `execute`, bearer-secret auth
-2. OAuth via `@cloudflare/workers-oauth-provider`, with Cloudflare Access OIDC
-   verifying the single user; grants live in KV and issued tokens replace the
-   static secret (required for ChatGPT / claude.ai hosts)
-3. Capability registry as plain typed modules (domain → capabilities)
-4. Sandboxed `execute` via Dynamic Workers (Worker Loader) once access exists;
-   until then, capabilities callable host-side only
-5. Notebook-first storage and capabilities, with memory following as the first
-   section layered on the notebook
+- Memories are notebook pages under `memory/`; the filing charter is a
+  notebook page itself (`memory/readme`) — edit it there, not in code.
+- `memory_remember` is verify-first: similar existing memories block the write
+  and are returned for update-or-force; wording steers merge-over-force.
+- Similarity thresholds in `src/memory/index.ts` are calibration knobs
+  (separate duplicate and relevance bars); tune from real use, and never
+  compare the RRF fusion score against a threshold.
+
+## Status
+
+v1 is complete and deployed: OAuth, two-signal search, the execute sandbox,
+notebook capabilities on the Bureau backend, memory with ambient
+memoryContext surfacing, and canonical links. Known backlog: similarity
+calibration from real use, Bureau reader polish, a scheduled brief-of-the-day
+routine (needs a scheduler and a notify channel), and the 2026-07-28 MCP
+envelope once hosts speak it.
 
 ## CI/CD
 

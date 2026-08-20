@@ -19,16 +19,22 @@ compact:
   capabilities (`await ayo.remember(...)`, `await ayo.notify(...)`) and Ayo
   runs it server-side in a sandbox.
 
-Capabilities live behind that surface as plain typed modules. The first real
-domain is memory — a considered rebuild of my earlier Jerry experiment — with
-automations and durable saved code as the long-term direction.
+Capabilities live behind that surface as plain typed modules. Live domains:
+the **notebook** (markdown pages with versions and history, stored in my
+Bureau workspace over a service binding, readable at stable
+`ayo.oflabs.dev/notebook/...` links behind my own auth) and **memory** — a
+considered rebuild of my earlier Jerry experiment — filed as notebook pages
+with verify-first writes and ambient recall. Automations (a scheduled brief of
+the day) are the next direction.
 
 Single-user by design: no tenancy, no signup, my data only.
 
 ## Stack
 
-Cloudflare Workers · TypeScript · pnpm · Vitest (workers pool) · D1 (planned)
-· Dynamic Workers for the execute sandbox (planned)
+Cloudflare Workers · TypeScript · pnpm · Vitest (workers pool) · KV ·
+Vectorize + Workers AI (search and recall) · Dynamic Workers via
+`@cloudflare/codemode` (the execute sandbox) · a service binding to Bureau
+(the notebook backend) · Workers Builds (deploy on merge)
 
 ## Development
 
