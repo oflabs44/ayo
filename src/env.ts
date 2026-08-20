@@ -9,6 +9,7 @@ type AiBinding = {
 };
 
 type VectorizeBinding = {
+	deleteByIds(ids: string[]): Promise<unknown>;
 	upsert(
 		vectors: Array<{ id: string; values: number[]; namespace: string }>,
 	): Promise<unknown>;

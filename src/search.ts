@@ -6,11 +6,12 @@ import {
 } from "./capabilities/index";
 import type { Env } from "./env";
 
-const EMBEDDING_MODEL = "@cf/baai/bge-small-en-v1.5";
+export const EMBEDDING_MODEL = "@cf/baai/bge-small-en-v1.5";
+export const EMBEDDING_MAX_INPUT_CHARS = 2_000;
 const CAPABILITY_NAMESPACE = "capabilities";
 const CONTENT_STAMP_KEY = "search:capabilities:content-stamp";
 const VECTOR_ID_PREFIX = "capability:";
-const RRF_CONSTANT = 60;
+export const RRF_CONSTANT = 60;
 const OVERVIEW_QUERIES = new Set(["what can you do"]);
 
 function callExample(capability: RegisteredCapability): string {
@@ -45,20 +46,30 @@ function capabilityText(capability: RegisteredCapability): string {
 	].join("\n");
 }
 
+export function identityBodyScore(
+	query: string,
+	identity: string,
+	body: string,
+): number {
+	const queryTokens = tokenize(query);
+	return (
+		0.7 * tokenOverlap(queryTokens, body) +
+		0.3 * tokenOverlap(queryTokens, identity)
+	);
+}
+
 function lexicalScore(
 	capability: RegisteredCapability,
 	query: string,
 ): number {
-	const queryTokens = tokenize(query);
-	const body = [
-		capability.description,
-		...(capability.keywords ?? []),
-		capability.domain,
-	].join("\n");
-
-	return (
-		0.7 * tokenOverlap(queryTokens, body) +
-		0.3 * tokenOverlap(queryTokens, capability.name)
+	return identityBodyScore(
+		query,
+		capability.name,
+		[
+			capability.description,
+			...(capability.keywords ?? []),
+			capability.domain,
+		].join("\n"),
 	);
 }
 
@@ -100,11 +111,16 @@ async function contentStamp(texts: string[]): Promise<string> {
 		.join("");
 }
 
-async function embedTexts(env: Env, texts: string[]): Promise<number[][]> {
+export async function embedTexts(
+	env: Env,
+	texts: string[],
+): Promise<number[][]> {
 	if (!env.AI) {
 		throw new Error("Workers AI binding is unavailable");
 	}
-	const response = await env.AI.run(EMBEDDING_MODEL, { text: texts });
+	const response = await env.AI.run(EMBEDDING_MODEL, {
+		text: texts.map((text) => text.slice(0, EMBEDDING_MAX_INPUT_CHARS)),
+	});
 	if (response.data.length !== texts.length) {
 		throw new Error(
 			`Embedding returned ${response.data.length} vectors for ${texts.length} texts`,
