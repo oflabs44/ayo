@@ -21,7 +21,6 @@ function mapMetadata(doc: BureauNotebookDocMeta): NotebookDocMeta {
 			createdAt: doc.metadata.createdAt,
 			updatedAt: doc.metadata.updatedAt,
 		},
-		...(doc.sourceUrl !== undefined ? { sourceUrl: doc.sourceUrl } : {}),
 	};
 }
 

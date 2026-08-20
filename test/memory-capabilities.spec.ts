@@ -152,4 +152,27 @@ describe("memory capabilities", () => {
 			});
 		},
 	);
+	it("updates a memory by its own path without refusing against itself", async () => {
+		const { dispatch, store } = createDispatch();
+		const first = (await dispatch.memory_remember!({
+			content: "I prefer aisle seats on flights.",
+		})) as { written: boolean; path: string };
+		expect(first.written).toBe(true);
+		const updated = (await dispatch.memory_remember!({
+			content: "I prefer aisle seats on flights, ideally near the front.",
+			path: first.path,
+		})) as { written: boolean; path: string };
+		expect(updated.written).toBe(true);
+		expect(updated.path).toBe(first.path);
+		const doc = await store.read(first.path);
+		expect(doc?.content).toContain("near the front");
+	});
+
+	it("rejects forgetting paths outside memory/", async () => {
+		const { dispatch } = createDispatch();
+		await expect(
+			dispatch.memory_forget!({ path: "briefs/2026-08-20" }),
+		).rejects.toThrow();
+	});
+
 });

@@ -17,7 +17,12 @@ export type MemoryRecallResult = {
 	title: string;
 	content: string;
 	updatedAt: string;
+	/** RRF fusion score: ordering only, not a similarity measure. */
 	score: number;
+	/** Word-overlap similarity in [0, 1]. */
+	lexicalScore: number;
+	/** Vectorize cosine similarity when the vector index answered. */
+	vectorScore?: number;
 };
 
 export function buildMemoryEmbedText(doc: NotebookDoc): string {
@@ -41,11 +46,16 @@ function parseIndexState(value: string | null): MemoryIndexState {
 				(entry): entry is [string, string] => typeof entry[1] === "string",
 			),
 		);
-	} catch {
+	} catch (error) {
+		console.error("memory index state was corrupt; treating as empty", {
+			reason: error instanceof Error ? error.message : String(error),
+		});
 		return {};
 	}
 }
 
+/** Deliberately not gated on SEARCH_OFFLINE: deleting a stale vector is cheap
+ * and keeps the index honest even when embedding is switched off. */
 export async function removeMemoryFromIndex(
 	env: Env,
 	path: string,
@@ -128,6 +138,38 @@ function rrfScores(rankings: string[][]): Map<string, number> {
 	return scores;
 }
 
+/**
+ * Similarity gate shared by verify-first remember and ambient surfacing.
+ * Thresholds are calibration knobs, deliberately conservative to start:
+ * cosine on bge-small for near-duplicate prose sits well above 0.80, and a
+ * 0.5 word-overlap means half the query's words appear in the memory. The
+ * RRF `score` is rank fusion and must never be compared to a threshold.
+ */
+export const DUPLICATE_VECTOR_THRESHOLD = 0.8;
+export const DUPLICATE_LEXICAL_THRESHOLD = 0.5;
+export const RELEVANT_VECTOR_THRESHOLD = 0.6;
+export const RELEVANT_LEXICAL_THRESHOLD = 0.15;
+
+type MemorySignals = { lexicalScore: number; vectorScore?: number };
+
+/** High bar: this looks like the same fact — used to refuse duplicate writes. */
+export function isSimilarMemory(result: MemorySignals): boolean {
+	return (
+		(result.vectorScore ?? 0) >= DUPLICATE_VECTOR_THRESHOLD ||
+		result.lexicalScore >= DUPLICATE_LEXICAL_THRESHOLD
+	);
+}
+
+/** Low bar: worth mentioning for this task — used by ambient surfacing. The
+ * lexical floor is low because tokenization has no stemming ("seat" never
+ * matches "seats"); the vector signal carries most of the load online. */
+export function isRelevantMemory(result: MemorySignals): boolean {
+	return (
+		(result.vectorScore ?? 0) >= RELEVANT_VECTOR_THRESHOLD ||
+		result.lexicalScore >= RELEVANT_LEXICAL_THRESHOLD
+	);
+}
+
 export async function recallMemories(
 	env: Env,
 	store: NotebookStore,
@@ -146,25 +188,30 @@ export async function recallMemories(
 		)
 	).filter((doc): doc is NotebookDoc => doc !== null);
 	const docsByPath = new Map(docs.map((doc) => [doc.path, doc]));
-	const lexicalRanking = docs
-		.map((doc) => ({
-			path: doc.path,
-			score: identityBodyScore(query, doc.metadata.title, doc.content),
-		}))
-		.filter(({ score }) => score > 0)
-		.sort((left, right) => right.score - left.score)
-		.map(({ path }) => path);
+	const lexicalScores = new Map(
+		docs.map((doc) => [
+			doc.path,
+			identityBodyScore(query, doc.metadata.title, doc.content),
+		]),
+	);
+	const lexicalRanking = [...lexicalScores.entries()]
+		.filter(([, score]) => score > 0)
+		.sort((left, right) => right[1] - left[1])
+		.map(([path]) => path);
 
 	let vectorRanking: string[] = [];
+	const vectorScores = new Map<string, number>();
 	if (!offline && docs.length > 0 && limit > 0) {
 		const [queryEmbedding] = await embedTexts(env, [query]);
 		const result = await env.VECTORIZE!.query(queryEmbedding!, {
 			topK: limit,
 			namespace: MEMORY_NAMESPACE,
 		});
-		vectorRanking = result.matches.flatMap(({ id }) =>
-			docsByPath.has(id) ? [id] : [],
-		);
+		vectorRanking = result.matches.flatMap(({ id, score }) => {
+			if (!docsByPath.has(id)) return [];
+			vectorScores.set(id, score);
+			return [id];
+		});
 	}
 
 	return [...rrfScores([lexicalRanking, vectorRanking]).entries()]
@@ -180,6 +227,8 @@ export async function recallMemories(
 							content: doc.content,
 							updatedAt: doc.metadata.updatedAt,
 							score,
+							lexicalScore: lexicalScores.get(path) ?? 0,
+							vectorScore: vectorScores.get(path),
 						},
 					]
 				: [];

@@ -18,7 +18,6 @@ type BureauNotebookDocMeta = {
 	path: string;
 	version: string;
 	metadata: BureauNotebookMetadata;
-	sourceUrl?: string;
 };
 
 type BureauNotebookDoc = BureauNotebookDocMeta & { content: string };

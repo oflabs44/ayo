@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+	isSimilarMemory,
 	recallMemories,
 	removeMemoryFromIndex,
 	syncMemoryIndex,
@@ -10,7 +11,6 @@ import { isValidNotebookPath, type NotebookStore } from "../notebook/store";
 import type { Capability } from "./index";
 
 const BACKEND_NOT_CONFIGURED = "The notebook backend is not configured.";
-export const RELATED_MEMORY_SCORE_THRESHOLD = 0.015;
 const MAX_SLUG_LENGTH = 48;
 
 const memoryPathSchema = z
@@ -84,11 +84,7 @@ export const memory: Capability[] = [
 				typeof rememberInputSchema
 			>;
 			const related = (await recallMemories(env, store, content))
-				.filter(
-					(result) =>
-						result.score > RELATED_MEMORY_SCORE_THRESHOLD &&
-						result.path !== path,
-				)
+				.filter((result) => isSimilarMemory(result) && result.path !== path)
 				.map(({ path, title, content, updatedAt: _updatedAt }) => ({
 					path,
 					title,

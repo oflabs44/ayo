@@ -20,7 +20,6 @@ function createBureauMock() {
 	const writeNotebookDoc = vi.fn(
 		async (_input: Parameters<BureauBinding["writeNotebookDoc"]>[0]) => ({
 			...document,
-			sourceUrl: "https://bureau.example/memory/aisle-seats",
 		}),
 	);
 	const readNotebookDoc = vi.fn(
@@ -81,7 +80,6 @@ describe("BureauNotebookStore", () => {
 			version: document.version,
 			metadata,
 			content: document.content,
-			sourceUrl: "https://bureau.example/memory/aisle-seats",
 		});
 	});
 

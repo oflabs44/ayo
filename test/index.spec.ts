@@ -4,6 +4,8 @@ import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/env";
 import worker from "../src/index";
+import { InMemoryNotebookStore } from "../src/notebook/memory-store";
+import type { NotebookStore } from "../src/notebook/store";
 
 const ORIGIN = "https://example.com";
 const ACCESS_ISSUER_BASE =
@@ -375,6 +377,12 @@ describe("OAuth-protected MCP worker", () => {
 
 	it("issues a token and serves MCP tools with conversation identity", async () => {
 		const testEnv = createTestEnv("happy-path");
+		const notebookStore = new InMemoryNotebookStore();
+		await notebookStore.write("memory/aisle-seats", {
+			title: "Travel preference",
+			content: "I prefer aisle seats on flights.",
+		});
+		testEnv.NOTEBOOK_STORE_FOR_TESTS = notebookStore;
 		const login = await beginLogin(testEnv);
 		const completed = await completeLogin(
 			testEnv,
@@ -428,19 +436,29 @@ describe("OAuth-protected MCP worker", () => {
 			"pass it back unchanged",
 		);
 		expect(initializeBody.result.instructions).toContain("Do not make one up");
+		expect(initializeBody.result.instructions).toContain(
+			"include a brief memoryContext describing the task",
+		);
 
 		const mcpResponse = await dispatch(
 			mcpRequest(authorizationHeader),
 			testEnv,
 		);
 		const mcpBody = (await mcpResponse.json()) as {
-			result: { tools: Array<{ name: string }> };
+			result: { tools: Array<{ name: string; description: string }> };
 		};
 		expect(mcpResponse.status).toBe(200);
 		expect(mcpBody.result.tools.map(({ name }) => name)).toEqual([
 			"search",
 			"execute",
 		]);
+		expect(
+			mcpBody.result.tools.every(({ description }) =>
+				description.includes(
+					"Optionally pass memoryContext, a brief task hint, to receive relevant remembered facts alongside the result.",
+				),
+			),
+		).toBe(true);
 
 		const search = await callTool<{
 			conversationId: string;
@@ -448,7 +466,16 @@ describe("OAuth-protected MCP worker", () => {
 				name: string;
 				inputSchema: Record<string, unknown>;
 			};
-		}>(testEnv, authorizationHeader, "search", { query: "whoami" });
+			memories: Array<{
+				path: string;
+				title: string;
+				content: string;
+				url: string;
+			}>;
+		}>(testEnv, authorizationHeader, "search", {
+			query: "whoami",
+			memoryContext: "planning travel with an aisle seat preference",
+		});
 		expect(search.status).toBe(200);
 		expect(search.result.conversationId).toEqual(expect.any(String));
 		expect(search.result.capability).toMatchObject({
@@ -459,23 +486,35 @@ describe("OAuth-protected MCP worker", () => {
 				additionalProperties: false,
 			},
 		});
+		expect(search.result.memories).toEqual([
+			{
+				path: "memory/aisle-seats",
+				title: "Travel preference",
+				content: "I prefer aisle seats on flights.",
+				url: "https://ayo.oflabs.dev/notebook/memory/aisle-seats",
+			},
+		]);
 
-		const searchEcho = await callTool<{ conversationId: string }>(
-			testEnv,
-			authorizationHeader,
-			"search",
-			{ query: "whoami", conversationId: search.result.conversationId },
-		);
+		const searchEcho = await callTool<{
+			conversationId: string;
+			memories?: unknown[];
+		}>(testEnv, authorizationHeader, "search", {
+			query: "whoami",
+			conversationId: search.result.conversationId,
+			memoryContext: "planning travel with an aisle seat preference",
+		});
 		expect(searchEcho.result.conversationId).toBe(
 			search.result.conversationId,
 		);
+		expect(searchEcho.result).not.toHaveProperty("memories");
 
-		const execute = await callTool<{ conversationId: string }>(
-			testEnv,
-			authorizationHeader,
-			"execute",
-			{ code: "export default async function main() {}" },
-		);
+		const execute = await callTool<{
+			conversationId: string;
+			memories: Array<{ path: string }>;
+		}>(testEnv, authorizationHeader, "execute", {
+			code: "export default async function main() {}",
+			memoryContext: "planning travel with an aisle seat preference",
+		});
 		expect(execute.status).toBe(200);
 		expect(execute.isError).toBe(true);
 		expect(execute.result).toEqual({
@@ -484,19 +523,52 @@ describe("OAuth-protected MCP worker", () => {
 			logs: [],
 			error:
 				"The sandbox is unavailable: no LOADER binding. Capabilities cannot run.",
+			memories: [
+				expect.objectContaining({ path: "memory/aisle-seats" }),
+			],
 		});
 
-		const executeEcho = await callTool<{ conversationId: string }>(
+		const executeEcho = await callTool<{
+			conversationId: string;
+			memories?: unknown[];
+		}>(
 			testEnv,
 			authorizationHeader,
 			"execute",
 			{
 				code: "export default async function main() {}",
 				conversationId: execute.result.conversationId,
+				memoryContext: "planning travel with an aisle seat preference",
 			},
 		);
 		expect(executeEcho.result.conversationId).toBe(
 			execute.result.conversationId,
+		);
+		expect(executeEcho.result).not.toHaveProperty("memories");
+
+		const surfacingError = new Error("notebook unavailable");
+		testEnv.NOTEBOOK_STORE_FOR_TESTS = {
+			list: vi.fn(async () => {
+				throw surfacingError;
+			}),
+		} as unknown as NotebookStore;
+		const consoleError = vi
+			.spyOn(console, "error")
+			.mockImplementation(() => undefined);
+		const searchWithFailedSurfacing = await callTool<{
+			conversationId: string;
+			capability: { name: string };
+			memories?: unknown[];
+		}>(testEnv, authorizationHeader, "search", {
+			query: "whoami",
+			memoryContext: "planning travel",
+		});
+
+		expect(searchWithFailedSurfacing.result.capability.name).toBe("whoami");
+		expect(searchWithFailedSurfacing.result).not.toHaveProperty("memories");
+		expect(consoleError).toHaveBeenCalledWith(
+			"ayo memory surfacing failed",
+			surfacingError,
 		);
 	});
 

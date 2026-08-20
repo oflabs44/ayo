@@ -58,7 +58,9 @@ against those capabilities, instead of one MCP tool per capability.
   server-issued id across related tool calls; it is not an authentication or
   isolation boundary.
 - Conversation suppression is stored in `OAUTH_KV` for
-  `SUPPRESSION_TTL_SECONDS` (six hours).
+  `SUPPRESSION_TTL_SECONDS` (six hours). Ambient memory surfacing is its first
+  consumer: returned memory paths are suppressed for the rest of the
+  conversation.
 
 ## Notebook
 
