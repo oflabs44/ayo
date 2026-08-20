@@ -1,18 +1,18 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Bind resources to your worker in `wrangler.jsonc`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+import OAuthProvider from "@cloudflare/workers-oauth-provider";
+import type { Env } from "./env";
+import { mcpHandler } from "./mcp";
+import { accessHandler } from "./oauth/access-oidc";
 
-export default {
-	async fetch(request, env, ctx): Promise<Response> {
-		return new Response("Hello World!");
+export default new OAuthProvider<Env>({
+	apiRoute: "/mcp",
+	apiHandler: mcpHandler,
+	defaultHandler: accessHandler,
+	authorizeEndpoint: "/authorize",
+	tokenEndpoint: "/oauth/token",
+	clientRegistrationEndpoint: "/oauth/register",
+	scopesSupported: ["mcp"],
+	resourceMetadata: {
+		scopes_supported: ["mcp"],
+		resource_name: "Ayo MCP server",
 	},
-} satisfies ExportedHandler<Env>;
+});
