@@ -31,14 +31,19 @@ function dispatch(request: Request, testEnv: Env): Promise<Response> {
 	return worker.fetch(request, testEnv, createExecutionContext());
 }
 
-function mcpRequest(headers: Record<string, string> = {}): Request {
+function mcpRequest(
+	headers: Record<string, string> = {},
+	method = "tools/list",
+	params?: Record<string, unknown>,
+): Request {
 	return new Request(`${ORIGIN}/mcp`, {
 		method: "POST",
 		headers: { ...MCP_HEADERS, ...headers },
 		body: JSON.stringify({
 			jsonrpc: "2.0",
 			id: 1,
-			method: "tools/list",
+			method,
+			params,
 		}),
 	});
 }
@@ -347,7 +352,7 @@ describe("OAuth-protected MCP worker", () => {
 		expect(nextResponse.status).toBe(200);
 	});
 
-	it("issues a token after Access OIDC login and accepts it at MCP", async () => {
+	it("issues a token and serves tools/list and capability search", async () => {
 		const testEnv = createTestEnv("happy-path");
 		const login = await beginLogin(testEnv);
 		const completed = await completeLogin(
@@ -392,6 +397,34 @@ describe("OAuth-protected MCP worker", () => {
 			"search",
 			"execute",
 		]);
+
+		const searchResponse = await dispatch(
+			mcpRequest(
+				{ Authorization: `Bearer ${token.access_token}` },
+				"tools/call",
+				{ name: "search", arguments: { query: "WHO" } },
+			),
+			testEnv,
+		);
+		const searchBody = (await searchResponse.json()) as {
+			result: { content: Array<{ text: string }> };
+		};
+		const searchResult = JSON.parse(searchBody.result.content[0].text) as {
+			capabilities: Array<{
+				name: string;
+				inputSchema: Record<string, unknown>;
+			}>;
+		};
+		expect(searchResponse.status).toBe(200);
+		expect(searchResult.capabilities).toHaveLength(1);
+		expect(searchResult.capabilities[0]).toMatchObject({
+			name: "whoami",
+			inputSchema: {
+				type: "object",
+				properties: {},
+				additionalProperties: false,
+			},
+		});
 	});
 
 	it.each([

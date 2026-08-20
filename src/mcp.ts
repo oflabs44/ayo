@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
+import { capabilities } from "./capabilities";
 
 function createServer(): McpServer {
 	const server = new McpServer({ name: "ayo", version: "0.0.0" });
@@ -11,17 +12,30 @@ function createServer(): McpServer {
 			description: "Search Ayo's capabilities",
 			inputSchema: { query: z.string() },
 		},
-		async () => ({
-			content: [
-				{
-					type: "text",
-					text: JSON.stringify({
-						capabilities: [],
-						note: "The capability registry is not implemented yet.",
-					}),
-				},
-			],
-		}),
+		async ({ query }) => {
+			const normalizedQuery = query.toLowerCase();
+			const matches = capabilities
+				.filter(({ name, description, domain }) =>
+					[name, description, domain].some((value) =>
+						value.toLowerCase().includes(normalizedQuery),
+					),
+				)
+				.map(({ name, description, domain, inputSchema }) => ({
+					name,
+					description,
+					domain,
+					inputSchema: z.toJSONSchema(inputSchema),
+				}));
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: JSON.stringify({ capabilities: matches }),
+					},
+				],
+			};
+		},
 	);
 
 	server.registerTool(
