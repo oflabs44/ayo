@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
-import { capabilities } from "./capabilities";
+import { capabilities } from "./capabilities/index";
 
 function createServer(): McpServer {
 	const server = new McpServer({ name: "ayo", version: "0.0.0" });
