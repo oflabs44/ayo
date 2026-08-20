@@ -149,7 +149,7 @@ async function redirectToAccess(
 		new URL("/oauth/callback", origin).href,
 	);
 	upstream.searchParams.set("response_type", "code");
-	upstream.searchParams.set("scope", "openid email");
+	upstream.searchParams.set("scope", "openid email profile");
 	upstream.searchParams.set("state", state);
 	upstream.searchParams.set("code_challenge", challenge);
 	upstream.searchParams.set("code_challenge_method", "S256");
