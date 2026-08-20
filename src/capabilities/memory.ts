@@ -69,13 +69,17 @@ async function availableMemoryPath(
 export const memory: Capability[] = [
 	{
 		name: "memory_remember",
-		description: "Remember a fact about me for later",
+		description:
+			"Remember or update topic-sized notes about me, never single-sentence memories; when creating one, prefer subject-named paths (memory/preferences/sports) rather than sentence-derived paths. Read memory/readme with notebook_read for sections and filing rules",
 		inputSchema: rememberInputSchema,
 		keywords: [
 			"remember this",
-			"save a fact",
-			"keep in mind",
 			"store preference",
+			"dietary preference",
+			"update topic note",
+			"group related facts",
+			"subject-based memory path",
+			"memory/readme filing rules",
 		],
 		handler: async (input, { env }) => {
 			const store = getNotebookStore(env);
@@ -96,7 +100,7 @@ export const memory: Capability[] = [
 					written: false,
 					related,
 					message:
-						"A related memory already exists. Update one by passing its path, or pass force: true to save a separate memory.",
+						"A related memory exists. The right move is usually to update it - pass its path and fold the new fact in. Use force: true only for a genuinely unrelated fact.",
 				};
 			}
 

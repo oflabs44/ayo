@@ -12,7 +12,7 @@ import { searchCapabilities } from "./search";
 const MEMORY_CONTEXT_DESCRIPTION =
 	"Optionally pass memoryContext, a brief task hint, to receive relevant remembered facts alongside the result.";
 const SERVER_INSTRUCTIONS =
-	"Ayo is your personal assistant. Use search to discover capabilities and execute to act through them. On the first tool call of a conversation, include a brief memoryContext describing the task; Ayo returns relevant memories at most once per conversation. If you have a conversationId from an earlier result in the same conversation, pass it back unchanged. Otherwise omit conversationId and reuse the id returned by Ayo on later calls. Do not make one up.";
+	"Ayo is your personal assistant. Use search to discover capabilities and execute to act through them. On the first tool call of a conversation, include a brief memoryContext describing the task; Ayo returns relevant memories at most once per conversation. If you have a conversationId from an earlier result in the same conversation, pass it back unchanged. Otherwise omit conversationId and reuse the id returned by Ayo on later calls. Do not make one up. Before filing a new memory, consult memory/readme.";
 const conversationIdInput = z.string().min(1).max(128).optional();
 const memoryContextInput = z.string().min(1).max(500).optional();
 

@@ -71,7 +71,7 @@ describe("memory capabilities", () => {
 				},
 			],
 			message:
-				"A related memory already exists. Update one by passing its path, or pass force: true to save a separate memory.",
+				"A related memory exists. The right move is usually to update it - pass its path and fold the new fact in. Use force: true only for a genuinely unrelated fact.",
 		});
 	});
 
