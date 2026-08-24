@@ -11,7 +11,7 @@ describe("capability search", () => {
 				{
 					domain: "meta",
 					description: "Capabilities for introspection and discovery",
-					capabilities: ["whoami", "capabilities_list"],
+					capabilities: ["whoami", "capabilities_list", "accounts_list"],
 				},
 				{
 					domain: "notebook",
@@ -37,7 +37,6 @@ describe("capability search", () => {
 					domain: "email",
 					description: "Search, read, draft, send, move, and flag email",
 					capabilities: [
-						"email_accounts",
 						"email_search",
 						"email_read",
 						"email_draft",
@@ -138,6 +137,7 @@ describe("capability search", () => {
 				text: [
 					expect.stringContaining("whoami\nmeta"),
 					expect.stringContaining("capabilities_list\nmeta"),
+					expect.stringContaining("accounts_list\nmeta"),
 					expect.stringContaining("notebook_write\nnotebook"),
 					expect.stringContaining("notebook_read\nnotebook"),
 					expect.stringContaining("notebook_list\nnotebook"),
@@ -146,7 +146,6 @@ describe("capability search", () => {
 					expect.stringContaining("memory_remember\nmemory"),
 					expect.stringContaining("memory_recall\nmemory"),
 					expect.stringContaining("memory_forget\nmemory"),
-					expect.stringContaining("email_accounts\nemail"),
 					expect.stringContaining("email_search\nemail"),
 					expect.stringContaining("email_read\nemail"),
 					expect.stringContaining("email_draft\nemail"),
@@ -169,6 +168,10 @@ describe("capability search", () => {
 			}),
 			expect.objectContaining({
 				id: "capability:capabilities_list",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:accounts_list",
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
@@ -201,10 +204,6 @@ describe("capability search", () => {
 			}),
 			expect.objectContaining({
 				id: "capability:memory_forget",
-				namespace: "capabilities",
-			}),
-			expect.objectContaining({
-				id: "capability:email_accounts",
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({

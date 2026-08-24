@@ -71,24 +71,9 @@ function draftKey(draftId: string): string {
 
 export const email: Capability[] = [
 	{
-		name: "email_accounts",
-		description: "List configured email accounts without exposing credentials",
-		inputSchema: z.object({}),
-		keywords: [
-			"email accounts",
-			"list mail accounts",
-			"which inbox",
-			"available addresses",
-		],
-		handler: async (_input, { env }) => {
-			if (!env.BUREAU) return unavailable();
-			return env.BUREAU.listAccounts({});
-		},
-	},
-	{
 		name: "email_search",
 		description:
-			"Find email threads or messages in an account; use email_accounts to list valid addresses",
+			"Find email threads or messages in an account; use accounts_list to find valid addresses",
 		inputSchema: searchInputSchema,
 		keywords: [
 			"search email",

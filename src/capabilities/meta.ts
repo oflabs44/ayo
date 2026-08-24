@@ -25,4 +25,23 @@ export const meta: Capability[] = [
 		handler: (_input, _ctx) =>
 			capabilities.map(({ name, description }) => ({ name, description })),
 	},
+	{
+		name: "accounts_list",
+		description:
+			"Tell which mail and calendar accounts are configured, without credentials",
+		inputSchema: z.object({}),
+		keywords: [
+			"email accounts",
+			"list mail accounts",
+			"calendar accounts",
+			"which inbox",
+			"available addresses",
+		],
+		handler: async (_input, { env }) => {
+			if (!env.BUREAU) {
+				return { error: "The accounts backend is not configured." };
+			}
+			return env.BUREAU.listAccounts({});
+		},
+	},
 ];
