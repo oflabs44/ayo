@@ -6,6 +6,14 @@ type AiBinding = {
 		model: string,
 		input: { text: string[] },
 	): Promise<{ data: number[][] }>;
+	run(
+		model: string,
+		input: Record<string, unknown>,
+		options?: {
+			gateway: { id: string; skipCache?: boolean; cacheTtl?: number };
+		},
+	): Promise<unknown>;
+	aiGatewayLogId?: string | null;
 };
 
 type BureauNotebookMetadata = {
@@ -122,6 +130,7 @@ export type Env = {
 	ACCESS_OIDC_CLIENT_SECRET: string;
 	ACCESS_OIDC_ISSUER: string;
 	AI?: AiBinding;
+	AI_GATEWAY_ID?: string;
 	BUREAU?: BureauBinding;
 	LOADER?: WorkerLoader;
 	NOTEBOOK_STORE_FOR_TESTS?: NotebookStore;

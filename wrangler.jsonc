@@ -11,6 +11,12 @@
 	"observability": {
 		"enabled": true,
 	},
+	"vars": {
+		// The account's default AI Gateway. A named gateway was tried in Jerry
+		// and third-party models fail through it (credential resolution only
+		// works via the default); re-test if the unified-billing surface changes.
+		"AI_GATEWAY_ID": "default",
+	},
 	"ai": {
 		"binding": "AI",
 	},

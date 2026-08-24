@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Env, OwnerProps } from "../env";
+import { ai } from "./ai";
 import { email } from "./email";
 import { memory } from "./memory";
 import { meta } from "./meta";
@@ -38,6 +39,10 @@ export const capabilityRegistry = {
 	email: {
 		description: "Search, read, draft, send, move, and flag email",
 		capabilities: email,
+	},
+	ai: {
+		description: "Run a model to judge, classify, or summarize something",
+		capabilities: ai,
 	},
 } satisfies Record<
 	string,

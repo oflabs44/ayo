@@ -42,6 +42,9 @@ const goldenQueries = [
 	["file this message in another folder", "email_move"],
 	["star this email message", "email_flag"],
 	["mark this message as unread", "email_flag"],
+	["run a model on this text", "ai_run"],
+	["classify this with an llm", "ai_run"],
+	["summarize this using ai", "ai_run"],
 ] as const;
 
 describe("capability search golden queries", () => {

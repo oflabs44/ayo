@@ -46,6 +46,12 @@ describe("capability search", () => {
 						"email_flag",
 					],
 				},
+				{
+					domain: "ai",
+					description:
+						"Run a model to judge, classify, or summarize something",
+					capabilities: ["ai_run"],
+				},
 			],
 		});
 	});
@@ -147,6 +153,7 @@ describe("capability search", () => {
 					expect.stringContaining("email_send\nemail"),
 					expect.stringContaining("email_move\nemail"),
 					expect.stringContaining("email_flag\nemail"),
+					expect.stringContaining("ai_run\nai"),
 				],
 			},
 		);
@@ -224,9 +231,13 @@ describe("capability search", () => {
 				id: "capability:email_flag",
 				namespace: "capabilities",
 			}),
+			expect.objectContaining({
+				id: "capability:ai_run",
+				namespace: "capabilities",
+			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 17,
+			topK: 18,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(
