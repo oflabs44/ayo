@@ -49,6 +49,7 @@ export type BureauBinding = {
 		path: string;
 	}): Promise<Array<{ version: string; updatedAt: string }>>;
 	deleteNotebookDoc(input: { path: string }): Promise<boolean>;
+	listAccounts(input: Record<string, never>): Promise<unknown[]>;
 	listThreads(input: {
 		address: string;
 		folder?: string;

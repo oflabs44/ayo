@@ -28,6 +28,8 @@ const goldenQueries = [
 	["recall my seat preference", "memory_recall"],
 	["forget what i said about aisle seats", "memory_forget"],
 	["remove this fact from memory", "memory_forget"],
+	["which email accounts do you have", "email_accounts"],
+	["list my mail accounts", "email_accounts"],
 	["find messages in my inbox", "email_search"],
 	["show my starred email", "email_search"],
 	["read this email thread", "email_read"],

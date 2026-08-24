@@ -37,6 +37,7 @@ describe("capability search", () => {
 					domain: "email",
 					description: "Search, read, draft, send, move, and flag email",
 					capabilities: [
+						"email_accounts",
 						"email_search",
 						"email_read",
 						"email_draft",
@@ -139,6 +140,7 @@ describe("capability search", () => {
 					expect.stringContaining("memory_remember\nmemory"),
 					expect.stringContaining("memory_recall\nmemory"),
 					expect.stringContaining("memory_forget\nmemory"),
+					expect.stringContaining("email_accounts\nemail"),
 					expect.stringContaining("email_search\nemail"),
 					expect.stringContaining("email_read\nemail"),
 					expect.stringContaining("email_draft\nemail"),
@@ -195,6 +197,10 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:email_accounts",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:email_search",
 				namespace: "capabilities",
 			}),
@@ -220,7 +226,7 @@ describe("capability search", () => {
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 16,
+			topK: 17,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(

@@ -12,6 +12,9 @@ const props: OwnerProps = {
 function createHarness() {
 	const drafts = new Map<string, string>();
 	const bureau = {
+		listAccounts: vi.fn(async () => [
+			{ address: "oladayo@example.com", primary: true },
+		]),
 		listThreads: vi.fn(async () => []),
 		listMessages: vi.fn(async () => []),
 		getThread: vi.fn(),
@@ -52,6 +55,15 @@ function createHarness() {
 }
 
 describe("email capabilities", () => {
+	it("lists the configured accounts", async () => {
+		const { bureau, dispatch } = createHarness();
+
+		await expect(dispatch.email_accounts!({})).resolves.toEqual([
+			{ address: "oladayo@example.com", primary: true },
+		]);
+		expect(bureau.listAccounts).toHaveBeenCalledWith({});
+	});
+
 	it("stores the user-facing preview and maps its body only when sending", async () => {
 		const { bureau, deleteDraft, dispatch, drafts, put } = createHarness();
 		const preview = {
