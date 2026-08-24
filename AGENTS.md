@@ -72,10 +72,9 @@ against those capabilities, instead of one MCP tool per capability.
 - `conversationId` is an application-level, honor-system relay: hosts reuse the
   server-issued id across related tool calls; it is not an authentication or
   isolation boundary.
-- Conversation suppression is stored in `OAUTH_KV` for
-  `SUPPRESSION_TTL_SECONDS` (six hours). Ambient memory surfacing is its first
-  consumer: returned memory paths are suppressed for the rest of the
-  conversation.
+- There is no per-conversation suppression. Ambient surfacing repeats on every
+  call that carries `memoryContext`; hiding after the first show loses the
+  memory when the host compacts away the earlier result (Kody ADR 0033).
 
 ## Notebook
 
@@ -116,6 +115,9 @@ Every new capability must ship with:
 - Similarity thresholds in `src/memory/index.ts` are calibration knobs
   (separate duplicate and relevance bars); tune from real use, and never
   compare the RRF fusion score against a threshold.
+- Ambient surfacing is compact and unhidden: the top two relevant memories
+  return as `title — summary` one-liners with their paths; hosts fetch full
+  content with `memory_recall`.
 
 ## Status
 

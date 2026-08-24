@@ -504,9 +504,7 @@ describe("OAuth-protected MCP worker", () => {
 			};
 			memories: Array<{
 				path: string;
-				title: string;
-				content: string;
-				url: string;
+				line: string;
 			}>;
 		}>(testEnv, authorizationHeader, "search", {
 			query: "whoami",
@@ -525,9 +523,7 @@ describe("OAuth-protected MCP worker", () => {
 		expect(search.result.memories).toEqual([
 			{
 				path: "memory/aisle-seats",
-				title: "Travel preference",
-				content: "I prefer aisle seats on flights.",
-				url: "https://ayo.oflabs.dev/notebook/memory/aisle-seats",
+				line: "Travel preference — I prefer aisle seats on flights.",
 			},
 		]);
 
@@ -542,7 +538,7 @@ describe("OAuth-protected MCP worker", () => {
 		expect(searchEcho.result.conversationId).toBe(
 			search.result.conversationId,
 		);
-		expect(searchEcho.result).not.toHaveProperty("memories");
+		expect(searchEcho.result.memories).toEqual(search.result.memories);
 
 		const execute = await callTool<{
 			conversationId: string;
@@ -580,7 +576,9 @@ describe("OAuth-protected MCP worker", () => {
 		expect(executeEcho.result.conversationId).toBe(
 			execute.result.conversationId,
 		);
-		expect(executeEcho.result).not.toHaveProperty("memories");
+		expect(executeEcho.result.memories).toEqual([
+			expect.objectContaining({ path: "memory/aisle-seats" }),
+		]);
 
 		const surfacingError = new Error("notebook unavailable");
 		testEnv.NOTEBOOK_STORE_FOR_TESTS = {

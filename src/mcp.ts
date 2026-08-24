@@ -12,22 +12,18 @@ import { searchCapabilities } from "./search";
 const MEMORY_CONTEXT_DESCRIPTION =
 	"Optionally pass memoryContext, a brief task hint, to receive relevant remembered facts alongside the result.";
 const SERVER_INSTRUCTIONS =
-	"Ayo is your personal assistant. Use search to discover capabilities and execute to act through them. On the first tool call of a conversation, include a brief memoryContext describing the task; Ayo returns relevant memories at most once per conversation. If you have a conversationId from an earlier result in the same conversation, pass it back unchanged. Otherwise omit conversationId and reuse the id returned by Ayo on later calls. Do not make one up. Before filing a new memory, consult memory/readme.";
+	"Ayo is your personal assistant. Use search to discover capabilities and execute to act through them. On tool calls, include a brief memoryContext describing the task; Ayo returns compact memory one-liners with the result. Repeats are expected; use memory_recall with a returned path for full content. If you have a conversationId from an earlier result in the same conversation, pass it back unchanged. Otherwise omit conversationId and reuse the id returned by Ayo on later calls. Do not make one up. Before filing a new memory, consult memory/readme.";
 const conversationIdInput = z.string().min(1).max(128).optional();
 const memoryContextInput = z.string().min(1).max(500).optional();
 
-async function memoriesForContext(
-	env: Env,
-	memoryContext: string | undefined,
-	conversationId: string,
-) {
+async function memoriesForContext(env: Env, memoryContext: string | undefined) {
 	if (!memoryContext) return [];
 	const store = getNotebookStore(env);
 	if (!store) {
 		console.error("memoryContext ignored: notebook backend is not configured");
 		return [];
 	}
-	return surfaceMemories(env, store, { memoryContext, conversationId });
+	return surfaceMemories(env, store, memoryContext);
 }
 
 function createServer(env: Env, props: OwnerProps): McpServer {
@@ -53,11 +49,7 @@ function createServer(env: Env, props: OwnerProps): McpServer {
 		}) => {
 			const conversationId = providedConversationId ?? mintConversationId();
 			const result = await searchCapabilities(query, env);
-			const memories = await memoriesForContext(
-				env,
-				memoryContext,
-				conversationId,
-			);
+			const memories = await memoriesForContext(env, memoryContext);
 			return {
 				content: [
 					{
@@ -92,11 +84,7 @@ function createServer(env: Env, props: OwnerProps): McpServer {
 		}) => {
 			const conversationId = providedConversationId ?? mintConversationId();
 			const outcome = await executeCode({ code, params, env, props });
-			const memories = await memoriesForContext(
-				env,
-				memoryContext,
-				conversationId,
-			);
+			const memories = await memoriesForContext(env, memoryContext);
 			return {
 				content: [
 					{
