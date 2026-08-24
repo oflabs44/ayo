@@ -12,7 +12,7 @@ const goldenQueries = [
 	["show available tools", "capabilities_list"],
 	["browse the capability registry", "capabilities_list"],
 	["write this down", "notebook_write"],
-	["save this as a draft", "notebook_write"],
+	["save this note as a draft page", "notebook_write"],
 	["read the brief", "notebook_read"],
 	["open a notebook page", "notebook_read"],
 	["show me my notes", "notebook_list"],
@@ -28,6 +28,18 @@ const goldenQueries = [
 	["recall my seat preference", "memory_recall"],
 	["forget what i said about aisle seats", "memory_forget"],
 	["remove this fact from memory", "memory_forget"],
+	["find messages in my inbox", "email_search"],
+	["show my starred email", "email_search"],
+	["read this email thread", "email_read"],
+	["show me the full message body", "email_read"],
+	["compose a new email", "email_draft"],
+	["prepare an email reply without sending", "email_draft"],
+	["send the reviewed email draft", "email_send"],
+	["deliver this draft now", "email_send"],
+	["move this email to archive", "email_move"],
+	["file this message in another folder", "email_move"],
+	["star this email message", "email_flag"],
+	["mark this message as unread", "email_flag"],
 ] as const;
 
 describe("capability search golden queries", () => {

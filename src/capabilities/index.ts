@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Env, OwnerProps } from "../env";
+import { email } from "./email";
 import { memory } from "./memory";
 import { meta } from "./meta";
 import { notebook } from "./notebook";
@@ -33,6 +34,10 @@ export const capabilityRegistry = {
 	memory: {
 		description: "Remember, recall, and forget facts about the owner",
 		capabilities: memory,
+	},
+	email: {
+		description: "Search, read, draft, send, move, and flag email",
+		capabilities: email,
 	},
 } satisfies Record<
 	string,

@@ -22,6 +22,13 @@ type BureauNotebookDocMeta = {
 
 type BureauNotebookDoc = BureauNotebookDocMeta & { content: string };
 
+type BureauMessageSummary = { id: string } & Record<string, unknown>;
+type BureauThread = { messages: BureauMessageSummary[] } & Record<
+	string,
+	unknown
+>;
+type BureauRecipient = { address: string; name?: string };
+
 export type BureauBinding = {
 	writeNotebookDoc(input: {
 		path: string;
@@ -42,6 +49,54 @@ export type BureauBinding = {
 		path: string;
 	}): Promise<Array<{ version: string; updatedAt: string }>>;
 	deleteNotebookDoc(input: { path: string }): Promise<boolean>;
+	listThreads(input: {
+		address: string;
+		folder?: string;
+		starred?: boolean;
+		limit?: number;
+		before?: string;
+		beforeId?: string;
+	}): Promise<unknown[]>;
+	listMessages(input: {
+		address: string;
+		folder?: string;
+		threadId?: string;
+		limit?: number;
+		before?: string;
+	}): Promise<unknown[]>;
+	getThread(input: { address: string; id: string }): Promise<BureauThread>;
+	getMessage(input: {
+		address: string;
+		id: string;
+	}): Promise<Record<string, unknown>>;
+	moveMessage(input: {
+		address: string;
+		id: string;
+		to: string;
+	}): Promise<BureauMessageSummary>;
+	setMessageFlags(input: {
+		address: string;
+		id: string;
+		add?: string[];
+		remove?: string[];
+	}): Promise<BureauMessageSummary>;
+	send(input: {
+		address: string;
+		to?: BureauRecipient[];
+		cc?: BureauRecipient[];
+		bcc?: BureauRecipient[];
+		fromName?: string;
+		subject: string;
+		text: string;
+		html?: string;
+		reference?: { id: string; action: "reply" | "replyAll" | "forward" };
+	}): Promise<{
+		id: string | null;
+		threadId: string | null;
+		messageId: string;
+		rejected: string[];
+		warning?: string;
+	}>;
 };
 
 type VectorizeBinding = {

@@ -33,6 +33,18 @@ describe("capability search", () => {
 						"memory_forget",
 					],
 				},
+				{
+					domain: "email",
+					description: "Search, read, draft, send, move, and flag email",
+					capabilities: [
+						"email_search",
+						"email_read",
+						"email_draft",
+						"email_send",
+						"email_move",
+						"email_flag",
+					],
+				},
 			],
 		});
 	});
@@ -127,6 +139,12 @@ describe("capability search", () => {
 					expect.stringContaining("memory_remember\nmemory"),
 					expect.stringContaining("memory_recall\nmemory"),
 					expect.stringContaining("memory_forget\nmemory"),
+					expect.stringContaining("email_search\nemail"),
+					expect.stringContaining("email_read\nemail"),
+					expect.stringContaining("email_draft\nemail"),
+					expect.stringContaining("email_send\nemail"),
+					expect.stringContaining("email_move\nemail"),
+					expect.stringContaining("email_flag\nemail"),
 				],
 			},
 		);
@@ -176,9 +194,33 @@ describe("capability search", () => {
 				id: "capability:memory_forget",
 				namespace: "capabilities",
 			}),
+			expect.objectContaining({
+				id: "capability:email_search",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:email_read",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:email_draft",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:email_send",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:email_move",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:email_flag",
+				namespace: "capabilities",
+			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 10,
+			topK: 16,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(
