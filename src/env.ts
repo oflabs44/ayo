@@ -36,6 +36,46 @@ type BureauThread = { messages: BureauMessageSummary[] } & Record<
 	unknown
 >;
 type BureauRecipient = { address: string; name?: string };
+type BureauCalendar = {
+	id: string;
+	account: string;
+	kind: "calendar";
+	url: string;
+	displayName: string | null;
+	color: string | null;
+	updatedAt: string;
+};
+type BureauCalendarEvent = {
+	id: string;
+	calendar: string;
+	uid: string;
+	summary: string | null;
+	start: string;
+	end: string;
+	allDay: boolean;
+	location: string | null;
+	description: string | null;
+	rrule?: string;
+	status: string | null;
+	etag: string;
+};
+type BureauCalendarEventWrite = {
+	address: string;
+	calendar: string;
+	summary: string;
+	start: string;
+	end?: string;
+	duration?: string;
+	allDay?: boolean;
+	location?: string;
+	description?: string;
+	rrule?: string;
+	alarms?: Array<{
+		trigger: string;
+		action?: "DISPLAY" | "EMAIL" | "AUDIO";
+		description?: string;
+	}>;
+};
 
 export type BureauBinding = {
 	writeNotebookDoc(input: {
@@ -106,6 +146,26 @@ export type BureauBinding = {
 		rejected: string[];
 		warning?: string;
 	}>;
+	listCalendars(input: { address: string }): Promise<BureauCalendar[]>;
+	listEvents(input: {
+		address: string;
+		from: string;
+		to: string;
+		calendar?: string;
+	}): Promise<BureauCalendarEvent[]>;
+	getEvent(input: {
+		address: string;
+		id: string;
+	}): Promise<BureauCalendarEvent & { raw: string }>;
+	createEvent(input: BureauCalendarEventWrite): Promise<BureauCalendarEvent>;
+	updateEvent(
+		input: BureauCalendarEventWrite & { id: string; etag: string },
+	): Promise<BureauCalendarEvent>;
+	removeEvent(input: {
+		address: string;
+		id: string;
+		etag?: string;
+	}): Promise<{ id: string }>;
 };
 
 type VectorizeBinding = {

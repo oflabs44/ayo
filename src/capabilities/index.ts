@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Env, OwnerProps } from "../env";
 import { ai } from "./ai";
+import { calendar } from "./calendar";
 import { email } from "./email";
 import { memory } from "./memory";
 import { meta } from "./meta";
@@ -39,6 +40,10 @@ export const capabilityRegistry = {
 	email: {
 		description: "Search, read, draft, send, move, and flag email",
 		capabilities: email,
+	},
+	calendar: {
+		description: "List calendars and read, create, update, or delete events",
+		capabilities: calendar,
 	},
 	ai: {
 		description: "Run a model to judge, classify, or summarize something",

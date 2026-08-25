@@ -46,6 +46,19 @@ describe("capability search", () => {
 					],
 				},
 				{
+					domain: "calendar",
+					description:
+						"List calendars and read, create, update, or delete events",
+					capabilities: [
+						"calendar_calendars",
+						"calendar_events",
+						"calendar_event_read",
+						"calendar_event_create",
+						"calendar_event_update",
+						"calendar_event_delete",
+					],
+				},
+				{
 					domain: "ai",
 					description:
 						"Run a model to judge, classify, or summarize something",
@@ -152,6 +165,12 @@ describe("capability search", () => {
 					expect.stringContaining("email_send\nemail"),
 					expect.stringContaining("email_move\nemail"),
 					expect.stringContaining("email_flag\nemail"),
+					expect.stringContaining("calendar_calendars\ncalendar"),
+					expect.stringContaining("calendar_events\ncalendar"),
+					expect.stringContaining("calendar_event_read\ncalendar"),
+					expect.stringContaining("calendar_event_create\ncalendar"),
+					expect.stringContaining("calendar_event_update\ncalendar"),
+					expect.stringContaining("calendar_event_delete\ncalendar"),
 					expect.stringContaining("ai_run\nai"),
 				],
 			},
@@ -231,12 +250,36 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:calendar_calendars",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:calendar_events",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:calendar_event_read",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:calendar_event_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:calendar_event_update",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:calendar_event_delete",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:ai_run",
 				namespace: "capabilities",
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 18,
+			topK: 24,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(
