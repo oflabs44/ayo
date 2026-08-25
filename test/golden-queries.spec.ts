@@ -44,6 +44,8 @@ const goldenQueries = [
 	["mark this message as unread", "email_flag"],
 	["list my calendars", "calendar_calendars"],
 	["which calendars can i use", "calendar_calendars"],
+	["create a new calendar for a project", "calendar_create"],
+	["add a separate calendar", "calendar_create"],
 	["what is on my calendar this week", "calendar_events"],
 	["show my appointments between monday and friday", "calendar_events"],
 	["open this calendar event", "calendar_event_read"],

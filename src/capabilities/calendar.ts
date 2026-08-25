@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+	burnConfirmation,
+	readConfirmation,
+	stageConfirmation,
+} from "../confirm";
 import type { Capability } from "./index";
 
 const BACKEND_NOT_CONFIGURED = "The calendar backend is not configured.";
@@ -53,6 +58,16 @@ const eventWriteSchema = z
 			});
 		}
 	});
+// Create only: renaming or deleting a calendar collection takes its events
+// with it, so those stay in Bureau's own UI.
+const calendarWriteSchema = accountSchema.extend({
+	name: z.string().min(1),
+	color: z.string().min(1).optional(),
+});
+const createCalendarSchema = z.union([
+	calendarWriteSchema,
+	z.object({ confirmId: z.string().min(1) }),
+]);
 const listEventsSchema = accountSchema.extend({
 	from: calendarDateTimeSchema,
 	to: calendarDateTimeSchema,
@@ -90,6 +105,47 @@ export const calendar: Capability[] = [
 		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
 			return env.BUREAU.listCalendars(input as z.infer<typeof accountSchema>);
+		},
+	},
+	{
+		name: "calendar_create",
+		description:
+			"Make a new empty calendar in an account. Confirm-before-act: the first call stages it and returns a preview plus confirmId; once approved, call again with only the confirmId",
+		inputSchema: createCalendarSchema,
+		keywords: [
+			"create a calendar",
+			"new calendar",
+			"add a separate calendar",
+			"calendar for a project",
+		],
+		handler: async (rawInput, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			const input = rawInput as z.infer<typeof createCalendarSchema>;
+
+			if (!("confirmId" in input)) {
+				const confirmId = await stageConfirmation(
+					env,
+					"calendar_create",
+					input,
+				);
+				return { confirmId, preview: input, created: false };
+			}
+
+			const staged = await readConfirmation(
+				env,
+				"calendar_create",
+				input.confirmId,
+			);
+			if (!staged) {
+				return {
+					created: false,
+					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the calendar again.`,
+				};
+			}
+			const calendarWrite = calendarWriteSchema.parse(JSON.parse(staged));
+			const created = await env.BUREAU.createCalendar(calendarWrite);
+			await burnConfirmation(env, "calendar_create", input.confirmId);
+			return { created: true, calendar: created };
 		},
 	},
 	{

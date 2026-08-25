@@ -51,6 +51,7 @@ describe("capability search", () => {
 						"List calendars and read, create, update, or delete events",
 					capabilities: [
 						"calendar_calendars",
+						"calendar_create",
 						"calendar_events",
 						"calendar_event_read",
 						"calendar_event_create",
@@ -166,6 +167,7 @@ describe("capability search", () => {
 					expect.stringContaining("email_move\nemail"),
 					expect.stringContaining("email_flag\nemail"),
 					expect.stringContaining("calendar_calendars\ncalendar"),
+					expect.stringContaining("calendar_create\ncalendar"),
 					expect.stringContaining("calendar_events\ncalendar"),
 					expect.stringContaining("calendar_event_read\ncalendar"),
 					expect.stringContaining("calendar_event_create\ncalendar"),
@@ -254,6 +256,10 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:calendar_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:calendar_events",
 				namespace: "capabilities",
 			}),
@@ -279,7 +285,7 @@ describe("capability search", () => {
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 24,
+			topK: 25,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(

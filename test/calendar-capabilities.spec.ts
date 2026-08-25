@@ -13,18 +13,32 @@ const props: OwnerProps = {
 };
 
 function createHarness() {
+	const staged = new Map<string, string>();
 	const bureau = {
 		listCalendars: vi.fn(async () => []),
+		createCalendar: vi.fn(async () => ({ id: calendarId })),
 		listEvents: vi.fn(async () => []),
 		getEvent: vi.fn(),
 		createEvent: vi.fn(),
 		updateEvent: vi.fn(),
 		removeEvent: vi.fn(),
 	} as unknown as BureauBinding;
-	const env = { BUREAU: bureau } as unknown as Env;
+	const env = {
+		BUREAU: bureau,
+		OAUTH_KV: {
+			get: vi.fn(async (key: string) => staged.get(key) ?? null),
+			put: vi.fn(async (key: string, value: string) => {
+				staged.set(key, value);
+			}),
+			delete: vi.fn(async (key: string) => {
+				staged.delete(key);
+			}),
+		},
+	} as unknown as Env;
 
 	return {
 		bureau,
+		env,
 		dispatch: buildDispatchTable(calendar, env, props),
 	};
 }
@@ -54,6 +68,88 @@ describe("calendar capabilities", () => {
 		await dispatch.calendar_calendars!({ address });
 
 		expect(bureau.listCalendars).toHaveBeenCalledWith({ address });
+	});
+
+	it("stages a calendar creation and only creates on a confirmed second call", async () => {
+		const { bureau, dispatch } = createHarness();
+
+		const stagedResult = (await dispatch.calendar_create!({
+			address,
+			name: "GeTu",
+			color: "#00aa55",
+		})) as { confirmId: string; created: boolean; preview: unknown };
+		expect(stagedResult.created).toBe(false);
+		expect(stagedResult.preview).toEqual({
+			address,
+			name: "GeTu",
+			color: "#00aa55",
+		});
+		expect(bureau.createCalendar).not.toHaveBeenCalled();
+
+		await expect(
+			dispatch.calendar_create!({ confirmId: stagedResult.confirmId }),
+		).resolves.toEqual({ created: true, calendar: { id: calendarId } });
+		expect(bureau.createCalendar).toHaveBeenCalledWith({
+			address,
+			name: "GeTu",
+			color: "#00aa55",
+		});
+
+		const reused = (await dispatch.calendar_create!({
+			confirmId: stagedResult.confirmId,
+		})) as { created: boolean; error: string };
+		expect(reused.created).toBe(false);
+		expect(reused.error).toContain("unknown or expired");
+		expect(bureau.createCalendar).toHaveBeenCalledTimes(1);
+	});
+
+	it("stages with the one-hour TTL and keeps the token when Bureau fails", async () => {
+		const { bureau, dispatch, env } = createHarness();
+
+		const stagedResult = (await dispatch.calendar_create!({
+			address,
+			name: "GeTu",
+		})) as { confirmId: string };
+		expect(env.OAUTH_KV.put).toHaveBeenCalledWith(
+			`confirm:calendar_create:${stagedResult.confirmId}`,
+			expect.any(String),
+			{ expirationTtl: 3_600 },
+		);
+
+		vi.mocked(bureau.createCalendar).mockRejectedValueOnce(
+			new Error("upstream: CalDAV discovery returned no home URL"),
+		);
+		await expect(
+			dispatch.calendar_create!({ confirmId: stagedResult.confirmId }),
+		).rejects.toThrow("CalDAV discovery");
+
+		await expect(
+			dispatch.calendar_create!({ confirmId: stagedResult.confirmId }),
+		).resolves.toEqual({ created: true, calendar: { id: calendarId } });
+	});
+
+	it("still reports success when token cleanup fails after creation", async () => {
+		const { bureau, dispatch, env } = createHarness();
+		const consoleError = vi
+			.spyOn(console, "error")
+			.mockImplementation(() => undefined);
+		const stagedResult = (await dispatch.calendar_create!({
+			address,
+			name: "GeTu",
+		})) as { confirmId: string };
+		vi.mocked(env.OAUTH_KV.delete).mockRejectedValueOnce(
+			new Error("KV unavailable"),
+		);
+
+		await expect(
+			dispatch.calendar_create!({ confirmId: stagedResult.confirmId }),
+		).resolves.toEqual({ created: true, calendar: { id: calendarId } });
+		expect(bureau.createCalendar).toHaveBeenCalledTimes(1);
+		expect(consoleError).toHaveBeenCalledWith(
+			"ayo calendar_create confirmation cleanup failed",
+			expect.any(Error),
+		);
+		consoleError.mockRestore();
 	});
 
 	it("forwards event windows and calendar filters without owning Bureau's bounds", async () => {

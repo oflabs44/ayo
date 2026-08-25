@@ -147,6 +147,11 @@ export type BureauBinding = {
 		warning?: string;
 	}>;
 	listCalendars(input: { address: string }): Promise<BureauCalendar[]>;
+	createCalendar(input: {
+		address: string;
+		name: string;
+		color?: string;
+	}): Promise<BureauCalendar>;
 	listEvents(input: {
 		address: string;
 		from: string;
