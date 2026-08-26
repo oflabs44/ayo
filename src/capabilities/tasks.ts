@@ -7,6 +7,12 @@ const accountSchema = z.object({ address: z.email() });
 const resourceSchema = accountSchema.extend({ id: z.uuid() });
 const calendarDateTimeSchema = z.iso.datetime({ offset: true });
 const calendarTimeSchema = z.union([z.iso.date(), calendarDateTimeSchema]);
+// A due date alone never notifies; only a VALARM makes iOS Reminders fire.
+const alarmSchema = z.object({
+	trigger: z.string().min(1),
+	action: z.enum(["DISPLAY", "EMAIL", "AUDIO"]).optional(),
+	description: z.string().optional(),
+});
 const listTasksSchema = accountSchema.extend({
 	calendar: z.uuid().optional(),
 	status: z.string().min(1).optional(),
@@ -19,6 +25,7 @@ const taskCreateBodySchema = z.object({
 	description: z.string().optional(),
 	priority: z.int().min(0).max(9).optional(),
 	status: z.string().min(1).optional(),
+	alarms: z.array(alarmSchema).optional(),
 });
 const createTaskSchema = taskCreateBodySchema.safeExtend(accountSchema.shape);
 const taskUpdateBodySchema = z
@@ -28,6 +35,7 @@ const taskUpdateBodySchema = z
 		summary: z.string().min(1).nullable().optional(),
 		description: z.string().nullable().optional(),
 		priority: z.int().min(0).max(9).nullable().optional(),
+		alarms: z.array(alarmSchema).nullable().optional(),
 	})
 	.refine(
 		(input) =>
@@ -35,7 +43,8 @@ const taskUpdateBodySchema = z
 			input.due !== undefined ||
 			input.summary !== undefined ||
 			input.description !== undefined ||
-			input.priority !== undefined,
+			input.priority !== undefined ||
+			input.alarms !== undefined,
 		{ message: "At least one todo field is required" },
 	);
 const updateTaskSchema = taskUpdateBodySchema.safeExtend({
@@ -88,7 +97,7 @@ export const tasks: Capability[] = [
 	{
 		name: "task_create",
 		description:
-			"Add a task or todo item to a calendar collection; use calendar_calendars first to find the calendar UUID",
+			"Add a task or todo item to a calendar collection, optionally with reminder alarms; use calendar_calendars first to find the calendar UUID",
 		inputSchema: createTaskSchema,
 		keywords: [
 			"create task",
@@ -107,7 +116,7 @@ export const tasks: Capability[] = [
 	{
 		name: "task_update",
 		description:
-			"Change a task's title, due date, description, priority, or status; mark it done by setting status to COMPLETED. Fields other than status can be null to clear them, and an ETag from task_read can make the update safe",
+			"Change a task's title, due date, reminder alarms, description, priority, or status; mark it done by setting status to COMPLETED. Fields other than status can be null to clear them, and an ETag from task_read can make the update safe",
 		inputSchema: updateTaskSchema,
 		keywords: [
 			"update task",

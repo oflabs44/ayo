@@ -70,11 +70,7 @@ type BureauCalendarEventWrite = {
 	location?: string;
 	description?: string;
 	rrule?: string;
-	alarms?: Array<{
-		trigger: string;
-		action?: "DISPLAY" | "EMAIL" | "AUDIO";
-		description?: string;
-	}>;
+	alarms?: BureauAlarm[];
 };
 type BureauTodo = {
 	id: string;
@@ -87,6 +83,11 @@ type BureauTodo = {
 	priority: number | null;
 	etag: string;
 };
+type BureauAlarm = {
+	trigger: string;
+	action?: "DISPLAY" | "EMAIL" | "AUDIO";
+	description?: string;
+};
 type BureauTodoCreate = {
 	address: string;
 	calendar: string;
@@ -95,6 +96,7 @@ type BureauTodoCreate = {
 	description?: string;
 	priority?: number;
 	status?: string;
+	alarms?: BureauAlarm[];
 };
 type BureauTodoUpdate = {
 	address: string;
@@ -105,6 +107,7 @@ type BureauTodoUpdate = {
 	summary?: string | null;
 	description?: string | null;
 	priority?: number | null;
+	alarms?: BureauAlarm[] | null;
 };
 
 export type BureauBinding = {

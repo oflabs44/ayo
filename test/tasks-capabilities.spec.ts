@@ -68,6 +68,38 @@ describe("tasks capabilities", () => {
 		expect(bureau.createTodo).toHaveBeenCalledWith(input);
 	});
 
+	it("carries reminder alarms on create and alarm-only updates and clearing", async () => {
+		const { bureau, dispatch } = createHarness();
+		const alarms = [
+			{ trigger: "-PT15M", action: "DISPLAY" as const, description: "Soon" },
+		];
+
+		await dispatch.task_create!({
+			address,
+			calendar: calendarId,
+			summary: "Drink water",
+			due: "2026-08-26T18:00:00+02:00",
+			alarms,
+		});
+		expect(bureau.createTodo).toHaveBeenCalledWith(
+			expect.objectContaining({ alarms }),
+		);
+
+		await dispatch.task_update!({ address, id: taskId, alarms });
+		expect(bureau.updateTodo).toHaveBeenCalledWith({
+			address,
+			id: taskId,
+			alarms,
+		});
+
+		await dispatch.task_update!({ address, id: taskId, alarms: null });
+		expect(bureau.updateTodo).toHaveBeenCalledWith({
+			address,
+			id: taskId,
+			alarms: null,
+		});
+	});
+
 	it("updates a task with only status COMPLETED", async () => {
 		const { bureau, dispatch } = createHarness();
 		const input = { address, id: taskId, status: "COMPLETED" };
