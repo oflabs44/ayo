@@ -94,10 +94,11 @@ function compareCalendarTimes(left: string, right: string): number {
 export const calendar: Capability[] = [
 	{
 		name: "calendar_calendars",
-		description: "Show which calendars are available in an email account",
+		description: "Find which calendars are available in an email account",
 		inputSchema: accountSchema,
 		keywords: [
 			"list calendars",
+			"list my calendars",
 			"available calendars",
 			"calendar folders",
 			"choose a calendar",
@@ -151,7 +152,7 @@ export const calendar: Capability[] = [
 	{
 		name: "calendar_events",
 		description:
-			"Show appointments, meetings, and other events scheduled between two dates",
+			"Find appointments, meetings, and other events scheduled between two dates",
 		inputSchema: listEventsSchema,
 		keywords: [
 			"calendar schedule",
@@ -159,6 +160,7 @@ export const calendar: Capability[] = [
 			"upcoming appointments",
 			"agenda between dates",
 			"what is scheduled",
+			"what is on my calendar this week",
 		],
 		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();

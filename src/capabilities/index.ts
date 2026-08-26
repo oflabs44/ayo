@@ -6,6 +6,7 @@ import { email } from "./email";
 import { memory } from "./memory";
 import { meta } from "./meta";
 import { notebook } from "./notebook";
+import { tasks } from "./tasks";
 
 export type CapabilityContext = {
 	env: Env;
@@ -44,6 +45,10 @@ export const capabilityRegistry = {
 	calendar: {
 		description: "List calendars and read, create, update, or delete events",
 		capabilities: calendar,
+	},
+	tasks: {
+		description: "List, read, create, update, and delete tasks",
+		capabilities: tasks,
 	},
 	ai: {
 		description: "Run a model to judge, classify, or summarize something",

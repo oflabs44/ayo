@@ -76,6 +76,36 @@ type BureauCalendarEventWrite = {
 		description?: string;
 	}>;
 };
+type BureauTodo = {
+	id: string;
+	calendar: string;
+	uid: string;
+	summary: string | null;
+	status: string | null;
+	due: string | null;
+	completed: string | null;
+	priority: number | null;
+	etag: string;
+};
+type BureauTodoCreate = {
+	address: string;
+	calendar: string;
+	summary: string;
+	due?: string;
+	description?: string;
+	priority?: number;
+	status?: string;
+};
+type BureauTodoUpdate = {
+	address: string;
+	id: string;
+	etag?: string;
+	status?: string;
+	due?: string | null;
+	summary?: string | null;
+	description?: string | null;
+	priority?: number | null;
+};
 
 export type BureauBinding = {
 	writeNotebookDoc(input: {
@@ -167,6 +197,23 @@ export type BureauBinding = {
 		input: BureauCalendarEventWrite & { id: string; etag: string },
 	): Promise<BureauCalendarEvent>;
 	removeEvent(input: {
+		address: string;
+		id: string;
+		etag?: string;
+	}): Promise<{ id: string }>;
+	listTodos(input: {
+		address: string;
+		calendar?: string;
+		status?: string;
+		dueBefore?: string;
+	}): Promise<BureauTodo[]>;
+	getTodo(input: {
+		address: string;
+		id: string;
+	}): Promise<BureauTodo & { raw: string }>;
+	createTodo(input: BureauTodoCreate): Promise<BureauTodo>;
+	updateTodo(input: BureauTodoUpdate): Promise<BureauTodo>;
+	removeTodo(input: {
 		address: string;
 		id: string;
 		etag?: string;
