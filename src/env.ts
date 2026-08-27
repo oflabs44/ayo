@@ -275,6 +275,7 @@ export type Env = {
 	AI?: AiBinding;
 	AI_GATEWAY_ID?: string;
 	BUREAU?: BureauBinding;
+	JOBS_DB: D1Database;
 	LOADER?: WorkerLoader;
 	NOTEBOOK_STORE_FOR_TESTS?: NotebookStore;
 	OAUTH_KV: KVNamespace;

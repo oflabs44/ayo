@@ -4,6 +4,7 @@ import { ai } from "./ai";
 import { calendar } from "./calendar";
 import { contacts } from "./contacts";
 import { email } from "./email";
+import { jobs } from "./jobs";
 import { memory } from "./memory";
 import { meta } from "./meta";
 import { notebook } from "./notebook";
@@ -54,6 +55,10 @@ export const capabilityRegistry = {
 	contacts: {
 		description: "Look up, save, and remove people in the address book",
 		capabilities: contacts,
+	},
+	jobs: {
+		description: "Schedule, inspect, run, update, and remove unattended scripts",
+		capabilities: jobs,
 	},
 	ai: {
 		description: "Run a model to judge, classify, or summarize something",

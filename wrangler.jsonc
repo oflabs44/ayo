@@ -11,6 +11,9 @@
 	"observability": {
 		"enabled": true,
 	},
+	"triggers": {
+		"crons": ["* * * * *"],
+	},
 	"vars": {
 		// The account's default AI Gateway. A named gateway was tried in Jerry
 		// and third-party models fail through it (credential resolution only
@@ -24,6 +27,14 @@
 		{
 			"binding": "VECTORIZE",
 			"index_name": "ayo-search",
+		},
+	],
+	"d1_databases": [
+		{
+			"binding": "JOBS_DB",
+			"database_name": "ayo-jobs",
+			"database_id": "bc2ca492-0d35-4645-bc47-e494e09a8452",
+			"migrations_dir": "migrations",
 		},
 	],
 	"kv_namespaces": [
