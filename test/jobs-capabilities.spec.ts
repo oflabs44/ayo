@@ -105,6 +105,80 @@ describe("job capabilities", () => {
 		});
 	});
 
+	it("carries trigger.accounts through staging, preview, and persisted read", async () => {
+		const { dispatch } = createHarness();
+		const trigger = {
+			source: "bureau",
+			kind: "mail.received",
+			accounts: ["ola@4wardthinkers.com"],
+		};
+
+		const staged = (await dispatch.job_create!({
+			name: "scoped",
+			code: "export default async function main() {}",
+			trigger,
+		})) as { confirmId: string; preview: { trigger: unknown } };
+		expect(staged.preview.trigger).toEqual(trigger);
+
+		const confirmed = (await dispatch.job_create!({
+			confirmId: staged.confirmId,
+		})) as { job: { id: string } };
+		await expect(
+			dispatch.job_read!({ id: confirmed.job.id }),
+		).resolves.toMatchObject({ trigger });
+	});
+
+	it("preserves, replaces, and clears trigger.accounts across updates", async () => {
+		const { dispatch } = createHarness();
+		const trigger = {
+			source: "bureau",
+			accounts: ["ola@4wardthinkers.com"],
+		};
+		const staged = (await dispatch.job_create!({
+			name: "scoped-update",
+			code: "export default async function main() {}",
+			trigger,
+		})) as { confirmId: string };
+		const created = (await dispatch.job_create!({
+			confirmId: staged.confirmId,
+		})) as { job: { id: string } };
+		const id = created.job.id;
+
+		const rename = (await dispatch.job_update!({
+			id,
+			name: "renamed",
+		})) as { confirmId: string; preview: { trigger: unknown } };
+		expect(rename.preview.trigger).toEqual(trigger);
+		await dispatch.job_update!({ confirmId: rename.confirmId });
+		await expect(dispatch.job_read!({ id })).resolves.toMatchObject({
+			trigger,
+		});
+
+		const widened = { source: "bureau", accounts: ["a@example.com", "b@example.com"] };
+		const replace = (await dispatch.job_update!({
+			id,
+			trigger: widened,
+		})) as { confirmId: string; preview: { trigger: unknown } };
+		expect(replace.preview.trigger).toEqual(widened);
+		await dispatch.job_update!({ confirmId: replace.confirmId });
+		await expect(dispatch.job_read!({ id })).resolves.toMatchObject({
+			trigger: widened,
+		});
+
+		const cleared = { source: "bureau" };
+		const clear = (await dispatch.job_update!({
+			id,
+			trigger: cleared,
+		})) as { confirmId: string; preview: { trigger: unknown } };
+		expect(clear.preview.trigger).toEqual(cleared);
+		await dispatch.job_update!({ confirmId: clear.confirmId });
+		const final = (await dispatch.job_read!({ id })) as {
+			trigger: Record<string, unknown>;
+		};
+		expect(final.trigger).toEqual(cleared);
+		expect(final.trigger).not.toHaveProperty("accounts");
+	});
+
 	it("requires a schedule or trigger", async () => {
 		const { dispatch } = createHarness();
 		vi.spyOn(console, "error").mockImplementation(() => undefined);

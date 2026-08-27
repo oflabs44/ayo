@@ -116,6 +116,14 @@ describe("triggered job runner", () => {
 		expect(await getJob(env, "account-mismatch")).toMatchObject({
 			runCount: 0,
 		});
+		// Filtering must happen BEFORE claiming: a claim row for the
+		// mismatched job would suppress a legitimate later redelivery.
+		const mismatchClaims = await env.JOBS_DB.prepare(
+			"SELECT COUNT(*) AS count FROM event_claims WHERE job_id = ?1",
+		)
+			.bind("account-mismatch")
+			.first<{ count: number }>();
+		expect(mismatchClaims?.count).toBe(0);
 		expect(await getJob(env, "all-accounts")).toMatchObject({ runCount: 1 });
 
 		const accountless = {
