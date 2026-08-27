@@ -144,10 +144,20 @@ export type BureauBinding = {
 	}): Promise<Array<{ version: string; updatedAt: string }>>;
 	deleteNotebookDoc(input: { path: string }): Promise<boolean>;
 	listAccounts(input: Record<string, never>): Promise<unknown[]>;
+	listTags(input: Record<string, never>): Promise<
+		Array<{
+			id: string;
+			name: string;
+			keyword: string;
+			color: string | null;
+			createdAt: string;
+		}>
+	>;
 	listThreads(input: {
 		address: string;
 		folder?: string;
 		starred?: boolean;
+		tag?: string;
 		limit?: number;
 		before?: string;
 		beforeId?: string;

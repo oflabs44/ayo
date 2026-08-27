@@ -12,6 +12,15 @@ const props: OwnerProps = {
 function createHarness() {
 	const drafts = new Map<string, string>();
 	const bureau = {
+		listTags: vi.fn(async () => [
+			{
+				id: "55555555-5555-4555-8555-555555555555",
+				name: "Receipts",
+				keyword: "AyoReceipts",
+				color: "#00aa55",
+				createdAt: "2026-08-27T00:00:00Z",
+			},
+		]),
 		listAccounts: vi.fn(async () => [
 			{ address: "oladayo@example.com", primary: true },
 		]),
@@ -55,6 +64,26 @@ function createHarness() {
 }
 
 describe("email capabilities", () => {
+	it("lists the tag registry and filters threads by tag", async () => {
+		const { bureau, dispatch } = createHarness();
+
+		const tags = (await dispatch.email_tags!({})) as Array<{
+			keyword: string;
+		}>;
+		expect(tags[0]?.keyword).toBe("AyoReceipts");
+		expect(bureau.listTags).toHaveBeenCalledWith({});
+
+		await dispatch.email_search!({
+			kind: "threads",
+			address: "oladayo@example.com",
+			tag: "55555555-5555-4555-8555-555555555555",
+		});
+		expect(bureau.listThreads).toHaveBeenCalledWith({
+			address: "oladayo@example.com",
+			tag: "55555555-5555-4555-8555-555555555555",
+		});
+	});
+
 	it("stores the user-facing preview and maps its body only when sending", async () => {
 		const { bureau, deleteDraft, dispatch, drafts, put } = createHarness();
 		const preview = {

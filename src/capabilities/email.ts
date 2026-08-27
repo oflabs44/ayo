@@ -18,6 +18,7 @@ const searchInputSchema = z.discriminatedUnion("kind", [
 		kind: z.literal("threads"),
 		folder: z.string().min(1).optional(),
 		starred: z.boolean().optional(),
+		tag: z.uuid().optional(),
 		...paginationFields,
 		beforeId: z.string().min(1).optional(),
 	}),
@@ -71,9 +72,25 @@ function draftKey(draftId: string): string {
 
 export const email: Capability[] = [
 	{
+		name: "email_tags",
+		description:
+			"List the mail tag registry: each tag's id, display name, color, and the IMAP keyword that email_flag applies or removes",
+		inputSchema: z.object({}),
+		keywords: [
+			"list email tags",
+			"which mail tags exist",
+			"mail labels",
+			"tag registry",
+		],
+		handler: async (_input, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			return env.BUREAU.listTags({});
+		},
+	},
+	{
 		name: "email_search",
 		description:
-			"Find email threads or messages in an account; use accounts_list to find valid addresses",
+			"Find email threads or messages in an account; use accounts_list to find valid addresses and email_tags to filter threads by tag",
 		inputSchema: searchInputSchema,
 		keywords: [
 			"search email",
@@ -187,7 +204,8 @@ export const email: Capability[] = [
 	},
 	{
 		name: "email_flag",
-		description: "Add or remove flags such as read or starred on an email message",
+		description:
+			"Add or remove flags on an email message: read or starred state, or a tag's keyword from email_tags to apply or clear that label",
 		inputSchema: flagInputSchema,
 		keywords: [
 			"flag email",
@@ -195,6 +213,8 @@ export const email: Capability[] = [
 			"mark as read",
 			"mark unread",
 			"remove flag",
+			"apply a label to this message",
+			"tag this email",
 		],
 		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
