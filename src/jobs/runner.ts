@@ -1,5 +1,9 @@
 import type { Env, OwnerProps } from "../env";
-import type { ExecuteOutcome } from "../execute";
+// Static despite the cycle (execute -> capabilities -> jobs -> runner):
+// values are only used inside function bodies, like meta.ts. A dynamic
+// import here makes esbuild lazy-wrap the shared graph and the Worker
+// dies at startup ("Class2 is not a constructor" in zod's init).
+import { type ExecuteOutcome, executeCode } from "../execute";
 import { nextRunAt } from "./schedule";
 import {
 	claimJob,
@@ -27,7 +31,6 @@ type JobExecutionContext = {
 async function defaultExecute(
 	input: JobExecutionInput,
 ): Promise<ExecuteOutcome> {
-	const { executeCode } = await import("../execute");
 	return executeCode(input);
 }
 
