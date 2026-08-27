@@ -284,6 +284,29 @@ describe("OAuth-protected MCP worker", () => {
 		await expect(response.text()).resolves.toBe("Not found");
 	});
 
+	it("handles webhook ingress before the OAuth provider", async () => {
+		const response = await dispatch(
+			new Request(`${ORIGIN}/hooks/unknown`, {
+				method: "POST",
+				body: JSON.stringify({ id: "event-1" }),
+			}),
+			createTestEnv("unknown-hook"),
+		);
+
+		expect(response.status).toBe(404);
+		await expect(response.text()).resolves.toBe("");
+	});
+
+	it("keeps non-POST webhook paths away from the OAuth provider", async () => {
+		const response = await dispatch(
+			new Request(`${ORIGIN}/hooks/bureau`),
+			createTestEnv("non-post-hook"),
+		);
+
+		expect(response.status).toBe(404);
+		await expect(response.text()).resolves.toBe("");
+	});
+
 	it("keeps the standard 404 response for other unknown routes", async () => {
 		const response = await dispatch(
 			new Request(`${ORIGIN}/not-a-route`),

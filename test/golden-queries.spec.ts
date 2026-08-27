@@ -87,6 +87,8 @@ const goldenQueries = [
 	["delete this contact", "contact_delete"],
 	["run this script every morning at 8", "job_create"],
 	["schedule an unattended cron job", "job_create"],
+	["when an email arrives tag it", "job_create"],
+	["run this when new mail comes in", "job_create"],
 	["what jobs are scheduled", "job_list"],
 	["list my recurring automations", "job_list"],
 	["inspect this scheduled job", "job_read"],

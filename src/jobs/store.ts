@@ -2,16 +2,24 @@ import type { Env, OwnerProps } from "../env";
 import type { JobSchedule } from "./schedule";
 
 const RETAINED_RUNS_PER_JOB = 50;
+// Bureau does not replay events beyond 30 days, so older claims can be removed.
+const EVENT_CLAIM_RETENTION_MS = 30 * 24 * 60 * 60_000;
 
 export type JobRunStatus = "success" | "error" | "expired";
 export type JobRunRecordStatus = "running" | JobRunStatus;
 export type JobRunSource = "schedule" | "manual";
 
+export type JobTrigger = {
+	source: string;
+	kind?: string;
+};
+
 export type JobRow = {
 	id: string;
 	name: string;
 	code: string;
-	schedule: JobSchedule;
+	schedule?: JobSchedule;
+	trigger?: JobTrigger;
 	timezone?: string;
 	enabled: boolean;
 	ownerProps: OwnerProps;
@@ -37,6 +45,7 @@ export type JobRunRow = {
 	error: string | null;
 	durationMs: number | null;
 	source: JobRunSource;
+	eventId: string | null;
 };
 
 export type JobClaim = {
@@ -51,6 +60,7 @@ type StoredJobRow = {
 	name: string;
 	code: string;
 	schedule_json: string;
+	trigger_json: string | null;
 	timezone: string | null;
 	enabled: number;
 	owner_props_json: string;
@@ -76,6 +86,7 @@ type StoredJobRunRow = {
 	error: string | null;
 	duration_ms: number | null;
 	source: JobRunSource;
+	event_id: string | null;
 };
 
 export function normalizeTimestamp(value: string): string {
@@ -91,7 +102,8 @@ export function normalizeSchedule(schedule: JobSchedule): JobSchedule {
 function normalizeJob(job: JobRow): JobRow {
 	return {
 		...job,
-		schedule: normalizeSchedule(job.schedule),
+		schedule:
+			job.schedule === undefined ? undefined : normalizeSchedule(job.schedule),
 		expiresAt:
 			job.expiresAt === null ? null : normalizeTimestamp(job.expiresAt),
 		nextRunAt:
@@ -103,8 +115,9 @@ function normalizeJob(job: JobRow): JobRow {
 	};
 }
 
-function parseSchedule(serialized: string): JobSchedule {
+function parseSchedule(serialized: string): JobSchedule | undefined {
 	const schedule = JSON.parse(serialized) as Record<string, unknown>;
+	if (Object.keys(schedule).length === 0) return undefined;
 	if (schedule.type === "once" && typeof schedule.runAt === "string") {
 		return normalizeSchedule({ type: "once", runAt: schedule.runAt });
 	}
@@ -115,6 +128,22 @@ function parseSchedule(serialized: string): JobSchedule {
 		return { type: "cron", expression: schedule.expression };
 	}
 	throw new Error("schedule_json does not contain a supported job schedule");
+}
+
+function parseTrigger(serialized: string | null): JobTrigger | undefined {
+	if (serialized === null) return undefined;
+	const trigger = JSON.parse(serialized) as Record<string, unknown>;
+	if (
+		typeof trigger.source !== "string" ||
+		trigger.source.length === 0 ||
+		(trigger.kind !== undefined && typeof trigger.kind !== "string")
+	) {
+		throw new Error("trigger_json does not contain a supported job trigger");
+	}
+	return {
+		source: trigger.source,
+		...(trigger.kind === undefined ? {} : { kind: trigger.kind }),
+	};
 }
 
 function parseOwnerProps(serialized: string): OwnerProps {
@@ -130,11 +159,17 @@ function parseOwnerProps(serialized: string): OwnerProps {
 }
 
 function fromStoredJob(row: StoredJobRow): JobRow {
+	const schedule = parseSchedule(row.schedule_json);
+	const trigger = parseTrigger(row.trigger_json);
+	if (schedule === undefined && trigger === undefined) {
+		throw new Error("job has neither a schedule nor a trigger");
+	}
 	return {
 		id: row.id,
 		name: row.name,
 		code: row.code,
-		schedule: parseSchedule(row.schedule_json),
+		schedule,
+		trigger,
 		timezone: row.timezone ?? undefined,
 		enabled: row.enabled === 1,
 		ownerProps: parseOwnerProps(row.owner_props_json),
@@ -166,6 +201,7 @@ function fromStoredRun(row: StoredJobRunRow): JobRunRow {
 		error: row.error,
 		durationMs: row.duration_ms,
 		source: row.source,
+		eventId: row.event_id,
 	};
 }
 
@@ -191,20 +227,23 @@ export async function createJob(env: Env, job: JobRow): Promise<void> {
 	const normalized = normalizeJob(job);
 	await env.JOBS_DB.prepare(
 		`INSERT INTO jobs (
-			id, name, code, schedule_json, timezone, enabled, owner_props_json,
-			expires_at, next_run_at, created_at, updated_at, last_run_at,
-			last_run_status, last_run_error, last_duration_ms, run_count,
-			success_count, error_count
+			id, name, code, schedule_json, trigger_json, timezone, enabled,
+			owner_props_json, expires_at, next_run_at, created_at, updated_at,
+			last_run_at, last_run_status, last_run_error, last_duration_ms,
+			run_count, success_count, error_count
 		) VALUES (
 			?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-			?15, ?16, ?17, ?18
+			?15, ?16, ?17, ?18, ?19
 		)`,
 	)
 		.bind(
 			normalized.id,
 			normalized.name,
 			normalized.code,
-			JSON.stringify(normalized.schedule),
+			JSON.stringify(normalized.schedule ?? {}),
+			normalized.trigger === undefined
+				? null
+				: JSON.stringify(normalized.trigger),
 			normalized.timezone ?? null,
 			normalized.enabled ? 1 : 0,
 			JSON.stringify(normalized.ownerProps),
@@ -234,18 +273,22 @@ export async function updateJob(
 			name = ?2,
 			code = ?3,
 			schedule_json = ?4,
-			timezone = ?5,
-			enabled = ?6,
-			expires_at = ?7,
-			next_run_at = ?8,
-			updated_at = ?9
-		WHERE id = ?1 AND updated_at = ?10`,
+			trigger_json = ?5,
+			timezone = ?6,
+			enabled = ?7,
+			expires_at = ?8,
+			next_run_at = ?9,
+			updated_at = ?10
+		WHERE id = ?1 AND updated_at = ?11`,
 	)
 		.bind(
 			normalized.id,
 			normalized.name,
 			normalized.code,
-			JSON.stringify(normalized.schedule),
+			JSON.stringify(normalized.schedule ?? {}),
+			normalized.trigger === undefined
+				? null
+				: JSON.stringify(normalized.trigger),
 			normalized.timezone ?? null,
 			normalized.enabled ? 1 : 0,
 			normalized.expiresAt,
@@ -291,8 +334,9 @@ export async function listDueJobs(env: Env, now: string): Promise<JobRow[]> {
 	const { results } = await env.JOBS_DB.prepare(
 		`SELECT * FROM jobs
 		WHERE enabled = 1
+			AND next_run_at IS NOT NULL
 			AND (
-				(next_run_at IS NOT NULL AND next_run_at <= ?1)
+				next_run_at <= ?1
 				OR (expires_at IS NOT NULL AND expires_at <= ?1)
 			)
 		ORDER BY next_run_at, id`,
@@ -300,6 +344,31 @@ export async function listDueJobs(env: Env, now: string): Promise<JobRow[]> {
 		.bind(normalizeTimestamp(now))
 		.all<StoredJobRow>();
 	return decodeRows(results);
+}
+
+export async function listTriggeredJobs(
+	env: Env,
+	now: string,
+): Promise<JobRow[]> {
+	const { results } = await env.JOBS_DB.prepare(
+		`SELECT * FROM jobs
+		WHERE enabled = 1
+			AND trigger_json IS NOT NULL
+			AND (expires_at IS NULL OR expires_at > ?1)
+		ORDER BY id`,
+	)
+		.bind(normalizeTimestamp(now))
+		.all<StoredJobRow>();
+	return decodeRows(results);
+}
+
+export async function pruneEventClaims(env: Env, now: number): Promise<void> {
+	const cutoff = new Date(now - EVENT_CLAIM_RETENTION_MS).toISOString();
+	await env.JOBS_DB.prepare(
+		"DELETE FROM event_claims WHERE claimed_at < ?1",
+	)
+		.bind(cutoff)
+		.run();
 }
 
 export async function claimJob(
@@ -314,15 +383,23 @@ export async function claimJob(
 	const startedAt = new Date(now).toISOString();
 	const updatedAt = revisionAfter(job.updatedAt, now);
 	const runId = `schedule:${job.id}:${job.nextRunAt}`;
+	const enabled = job.trigger !== undefined || nextRunAt !== null;
 	const [claimResult] = await env.JOBS_DB.batch([
 		env.JOBS_DB.prepare(
 			`UPDATE jobs SET
 				next_run_at = ?2,
 				updated_at = ?3,
-				enabled = CASE WHEN ?2 IS NULL THEN 0 ELSE enabled END
+				enabled = ?6
 			WHERE id = ?1 AND next_run_at = ?4 AND enabled = 1
 				AND updated_at = ?5`,
-		).bind(job.id, nextRunAt, updatedAt, job.nextRunAt, job.updatedAt),
+		).bind(
+			job.id,
+			nextRunAt,
+			updatedAt,
+			job.nextRunAt,
+			job.updatedAt,
+			enabled ? 1 : 0,
+		),
 		env.JOBS_DB.prepare(
 			`INSERT OR IGNORE INTO job_runs (
 				id, job_id, started_at, finished_at, status, error, duration_ms, source
@@ -344,7 +421,7 @@ export async function claimJob(
 	]);
 	if (!changed(claimResult)) return null;
 	return {
-		job: { ...job, nextRunAt, enabled: nextRunAt !== null, updatedAt },
+		job: { ...job, nextRunAt, enabled, updatedAt },
 		runId,
 		startedAt,
 		source: "schedule",
@@ -361,7 +438,8 @@ export async function claimManualRun(
 	nextRunAt = nextRunAt === null ? null : normalizeTimestamp(nextRunAt);
 	const startedAt = new Date(now).toISOString();
 	const updatedAt = revisionAfter(job.updatedAt, now);
-	const enabled = job.enabled && nextRunAt !== null;
+	const enabled =
+		job.enabled && (job.trigger !== undefined || nextRunAt !== null);
 	const runId = `manual:${job.id}:${job.updatedAt}`;
 	const [claimResult] = await env.JOBS_DB.batch([
 		env.JOBS_DB.prepare(
@@ -394,6 +472,82 @@ export async function claimManualRun(
 		startedAt,
 		source: "manual",
 	};
+}
+
+export async function claimTriggeredRun(
+	env: Env,
+	job: JobRow,
+	eventId: string,
+	now: number,
+): Promise<JobClaim | null> {
+	job = normalizeJob(job);
+	if (job.trigger === undefined) return null;
+	const startedAt = new Date(now).toISOString();
+	const runId = `trigger:${crypto.randomUUID()}`;
+	const [claimResult] = await env.JOBS_DB.batch([
+		env.JOBS_DB.prepare(
+			`INSERT OR IGNORE INTO event_claims (job_id, event_id, claimed_at)
+			SELECT ?1, ?2, ?3
+			WHERE EXISTS (
+				SELECT 1 FROM jobs
+				WHERE id = ?1
+					AND enabled = 1
+					AND trigger_json = ?4
+					AND (expires_at IS NULL OR expires_at > ?3)
+					AND updated_at = ?5
+			)`,
+		).bind(
+			job.id,
+			eventId,
+			startedAt,
+			JSON.stringify(job.trigger),
+			job.updatedAt,
+		),
+		env.JOBS_DB.prepare(
+			`INSERT INTO job_runs (
+				id, job_id, started_at, finished_at, status, error, duration_ms,
+				source, event_id
+			)
+			SELECT ?1, ?2, ?3, NULL, 'running', NULL, NULL, 'schedule', ?4
+			WHERE changes() = 1 AND EXISTS (
+				SELECT 1 FROM event_claims
+				WHERE job_id = ?2 AND event_id = ?4 AND claimed_at = ?3
+			)`,
+		).bind(runId, job.id, startedAt, eventId),
+		env.JOBS_DB.prepare(
+			`DELETE FROM job_runs
+			WHERE job_id = ?1 AND id NOT IN (
+				SELECT id FROM job_runs
+				WHERE job_id = ?1
+					ORDER BY started_at DESC, rowid DESC
+					LIMIT ?2
+			)`,
+		).bind(job.id, RETAINED_RUNS_PER_JOB),
+	]);
+	if (!changed(claimResult)) {
+		const state = await env.JOBS_DB.prepare(
+			`SELECT
+				EXISTS (
+					SELECT 1 FROM event_claims
+					WHERE job_id = ?1 AND event_id = ?2
+				) AS claimed,
+				EXISTS (
+					SELECT 1 FROM jobs
+					WHERE id = ?1
+						AND enabled = 1
+						AND trigger_json = ?3
+						AND (expires_at IS NULL OR expires_at > ?4)
+				) AS eligible`,
+		)
+			.bind(job.id, eventId, JSON.stringify(job.trigger), startedAt)
+			.first<{ claimed: number; eligible: number }>();
+		if (state?.claimed === 1) return null;
+		if (state?.eligible === 1) {
+			throw new Error(`Job ${job.id} changed before the event could be claimed.`);
+		}
+		return null;
+	}
+	return { job, runId, startedAt, source: "schedule" };
 }
 
 export async function disableJob(

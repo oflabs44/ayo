@@ -285,6 +285,7 @@ export type OwnerProps = {
 };
 
 export type Env = {
+	[key: string]: unknown;
 	ACCESS_OIDC_CLIENT_ID: string;
 	ACCESS_OIDC_CLIENT_SECRET: string;
 	ACCESS_OIDC_ISSUER: string;
@@ -298,4 +299,5 @@ export type Env = {
 	OAUTH_PROVIDER: OAuthHelpers;
 	SEARCH_OFFLINE?: string;
 	VECTORIZE?: VectorizeBinding;
+	WEBHOOK_SECRET_BUREAU?: string;
 };

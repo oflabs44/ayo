@@ -75,6 +75,45 @@ describe("job capabilities", () => {
 		});
 	});
 
+	it("stages and reads a trigger-only job", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(now);
+		const { dispatch } = createHarness();
+		const trigger = { source: "bureau", kind: "mail.received" };
+
+		const staged = (await dispatch.job_create!({
+			name: "Tag new mail",
+			code: createInput.code,
+			trigger,
+		})) as {
+			confirmId: string;
+			preview: Record<string, unknown>;
+		};
+		expect(staged.preview).toMatchObject({ trigger });
+		expect(staged.preview).not.toHaveProperty("schedule");
+
+		const confirmed = (await dispatch.job_create!({
+			confirmId: staged.confirmId,
+		})) as { job: { id: string; nextRunAt: string | null } };
+		expect(confirmed.job.nextRunAt).toBeNull();
+		await expect(dispatch.job_list!({})).resolves.toMatchObject({
+			jobs: [{ id: confirmed.job.id, trigger, scheduleSummary: null }],
+		});
+		await expect(dispatch.job_read!({ id: confirmed.job.id })).resolves.toMatchObject({
+			trigger,
+			nextRunAt: null,
+		});
+	});
+
+	it("requires a schedule or trigger", async () => {
+		const { dispatch } = createHarness();
+		vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+		await expect(
+			dispatch.job_create!({ name: "Never", code: createInput.code }),
+		).rejects.toThrow("schedule, a trigger, or both");
+	});
+
 	it("normalizes offset timestamps before staging and storage", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
@@ -133,10 +172,12 @@ describe("job capabilities", () => {
 		const { dispatch } = createHarness();
 		const created = await createConfirmed(dispatch);
 
+		const trigger = { source: "bureau", kind: "mail.received" };
 		const staged = (await dispatch.job_update!({
 			id: created.job.id,
 			enabled: false,
 			name: "Paused brief",
+			trigger,
 		})) as {
 			confirmId: string;
 			updated: boolean;
@@ -149,13 +190,19 @@ describe("job capabilities", () => {
 			enabled: false,
 			code: createInput.code,
 			schedule: createInput.schedule,
+			trigger,
 		});
 
 		await expect(
 			dispatch.job_update!({ confirmId: staged.confirmId }),
 		).resolves.toMatchObject({
 			updated: true,
-			job: { id: created.job.id, name: "Paused brief", enabled: false },
+			job: {
+				id: created.job.id,
+				name: "Paused brief",
+				enabled: false,
+				trigger,
+			},
 		});
 		const reused = (await dispatch.job_update!({
 			confirmId: staged.confirmId,

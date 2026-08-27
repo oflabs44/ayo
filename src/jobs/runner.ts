@@ -8,9 +8,12 @@ import { nextRunAt } from "./schedule";
 import {
 	claimJob,
 	claimManualRun,
+	claimTriggeredRun,
 	disableJob,
 	finalizeJobRun,
 	listDueJobs,
+	listTriggeredJobs,
+	pruneEventClaims,
 	type JobClaim,
 	type JobRow,
 	type JobRunSource,
@@ -18,6 +21,7 @@ import {
 
 type JobExecutionInput = {
 	code: string;
+	params?: Record<string, unknown>;
 	env: Env;
 	props: OwnerProps;
 };
@@ -45,6 +49,7 @@ function errorMessage(error: unknown): string {
 }
 
 function nextForRun(job: JobRow, now: number): string | null {
+	if (job.schedule === undefined) return null;
 	const next = nextRunAt({
 		schedule: job.schedule,
 		timezone: job.timezone,
@@ -57,11 +62,13 @@ async function executeAndRecord(
 	env: Env,
 	claim: JobClaim,
 	execute: ExecuteJobCode,
+	params?: Record<string, unknown>,
 ): Promise<JobRunResult> {
 	let outcome: ExecuteOutcome;
 	try {
 		outcome = await execute({
 			code: claim.job.code,
+			params,
 			env,
 			props: claim.job.ownerProps,
 		});
@@ -173,6 +180,63 @@ export async function runDueJobs(
 	}
 
 	if (runs.length > 0) ctx.waitUntil(Promise.all(runs).then(() => undefined));
+}
+
+export type TriggeredEvent = Record<string, unknown> & {
+	id: string;
+	kind?: string;
+};
+
+export async function runTriggeredJobs(
+	env: Env,
+	ctx: JobExecutionContext,
+	source: string,
+	event: TriggeredEvent,
+	execute: ExecuteJobCode = defaultExecute,
+): Promise<void> {
+	const now = Date.now();
+	await pruneEventClaims(env, now);
+	const jobs = await listTriggeredJobs(env, new Date(now).toISOString());
+	const claims: JobClaim[] = [];
+	const claimErrors: unknown[] = [];
+	const failedJobIds: string[] = [];
+
+	for (const job of jobs) {
+		if (
+			job.trigger?.source !== source ||
+			(job.trigger.kind !== undefined && job.trigger.kind !== event.kind)
+		) {
+			continue;
+		}
+
+		try {
+			const claim = await claimTriggeredRun(env, job, event.id, now);
+			if (claim !== null) claims.push(claim);
+		} catch (error) {
+			claimErrors.push(error);
+			failedJobIds.push(job.id);
+		}
+	}
+
+	const runs = claims.map((claim) =>
+		executeAndRecord(env, claim, execute, { event, source }).then(
+			() => undefined,
+			(error: unknown) => {
+				console.error("ayo triggered job run could not be recorded", {
+					job: claim.job.id,
+					error,
+				});
+			},
+		),
+	);
+	if (runs.length > 0) ctx.waitUntil(Promise.all(runs).then(() => undefined));
+
+	if (claimErrors.length > 0) {
+		throw new AggregateError(
+			claimErrors,
+			`Triggered jobs could not be claimed: ${failedJobIds.join(", ")}`,
+		);
+	}
 }
 
 export async function runJobNow(

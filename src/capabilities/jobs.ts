@@ -22,6 +22,7 @@ import {
 	normalizeTimestamp,
 	updateJob,
 	type JobRow,
+	type JobTrigger,
 } from "../jobs/store";
 import type { Capability } from "./index";
 
@@ -60,19 +61,29 @@ const scheduleSchema = z.discriminatedUnion("type", [
 			),
 	}),
 ]);
-const expiresAtSchema = z.iso.datetime({ offset: true }).nullable();
-const createPayloadSchema = z.object({
-	name: z.string().trim().min(1).max(80),
-	code: codeSchema,
-	schedule: scheduleSchema,
-	timezone: z.string().min(1).default("UTC"),
-	expiresAt: expiresAtSchema.optional(),
+const triggerSchema = z.object({
+	source: z.string().min(1),
+	kind: z.string().optional(),
 });
+const expiresAtSchema = z.iso.datetime({ offset: true }).nullable();
+const createPayloadSchema = z
+	.object({
+		name: z.string().trim().min(1).max(80),
+		code: codeSchema,
+		schedule: scheduleSchema.optional(),
+		trigger: triggerSchema.optional(),
+		timezone: z.string().min(1).default("UTC"),
+		expiresAt: expiresAtSchema.optional(),
+	})
+	.refine(({ schedule, trigger }) => schedule !== undefined || trigger !== undefined, {
+		message: "A job requires a schedule, a trigger, or both.",
+	});
 const createJobSchema = z.union([createPayloadSchema, confirmSchema]);
 const jobChangeShape = {
 	name: z.string().trim().min(1).max(80).optional(),
 	code: codeSchema.optional(),
 	schedule: scheduleSchema.optional(),
+	trigger: triggerSchema.optional(),
 	timezone: z.string().min(1).optional(),
 	enabled: z.boolean().optional(),
 	expiresAt: expiresAtSchema.optional(),
@@ -96,7 +107,8 @@ const jobRowSchema = z.object({
 	id: z.uuid(),
 	name: z.string(),
 	code: z.string(),
-	schedule: scheduleSchema,
+	schedule: scheduleSchema.optional(),
+	trigger: triggerSchema.optional(),
 	timezone: z.string().optional(),
 	enabled: z.boolean(),
 	ownerProps: ownerPropsSchema,
@@ -145,12 +157,16 @@ function newJob(
 	now: number,
 ): JobRow {
 	const timestamp = new Date(now).toISOString();
-	const schedule = normalizeSchedule(payload.schedule);
+	const schedule =
+		payload.schedule === undefined
+			? undefined
+			: normalizeSchedule(payload.schedule);
 	return {
 		id: crypto.randomUUID(),
 		name: payload.name,
 		code: payload.code,
 		schedule,
+		trigger: payload.trigger,
 		timezone: payload.timezone,
 		enabled: true,
 		ownerProps: { ...props },
@@ -158,7 +174,8 @@ function newJob(
 			payload.expiresAt === null
 				? null
 				: normalizeTimestamp(payload.expiresAt),
-		nextRunAt: nextFor(schedule, payload.timezone, now),
+		nextRunAt:
+			schedule === undefined ? null : nextFor(schedule, payload.timezone, now),
 		createdAt: timestamp,
 		updatedAt: timestamp,
 		lastRunAt: null,
@@ -179,32 +196,46 @@ function revisionAfter(updatedAt: string, now: number): string {
 }
 
 function mergeJob(job: JobRow, changes: JobChanges, now: number): JobRow {
-	const schedule = normalizeSchedule(changes.schedule ?? job.schedule);
+	const schedule =
+		changes.schedule === undefined
+			? job.schedule
+			: normalizeSchedule(changes.schedule);
+	const trigger: JobTrigger | undefined = changes.trigger ?? job.trigger;
+	if (schedule === undefined && trigger === undefined) {
+		throw new Error("A job requires a schedule, a trigger, or both.");
+	}
 	const timezone = changes.timezone ?? job.timezone ?? "UTC";
 	const scheduleChanged =
 		changes.schedule !== undefined ||
-		(changes.timezone !== undefined && schedule.type === "cron");
+		(changes.timezone !== undefined && schedule?.type === "cron");
 	const expiresAt =
 		changes.expiresAt === undefined
 			? job.expiresAt
 			: changes.expiresAt === null
 				? null
 				: normalizeTimestamp(changes.expiresAt);
+	let nextRunAt = job.nextRunAt;
+	if (scheduleChanged) {
+		nextRunAt =
+			schedule === undefined ? null : nextFor(schedule, timezone, now);
+	}
 	return {
 		...job,
 		...changes,
 		schedule,
+		trigger,
 		timezone,
 		expiresAt,
-		nextRunAt: scheduleChanged
-			? nextFor(schedule, timezone, now)
-			: job.nextRunAt,
+		nextRunAt,
 		updatedAt: revisionAfter(job.updatedAt, now),
 	};
 }
 
 function createPreview(payload: CreatePayload, now: number) {
-	const schedule = normalizeSchedule(payload.schedule);
+	const schedule =
+		payload.schedule === undefined
+			? undefined
+			: normalizeSchedule(payload.schedule);
 	const expiresAt =
 		payload.expiresAt === undefined
 			? new Date(now + DEFAULT_EXPIRY_MS).toISOString()
@@ -213,15 +244,21 @@ function createPreview(payload: CreatePayload, now: number) {
 				: normalizeTimestamp(payload.expiresAt);
 	// Compute once during staging so malformed or exhausted schedules never get
 	// as far as a confirmation token.
-	nextFor(schedule, payload.timezone, now);
-	return { ...payload, schedule, expiresAt };
+	if (schedule !== undefined) nextFor(schedule, payload.timezone, now);
+	return schedule === undefined
+		? { ...payload, expiresAt }
+		: { ...payload, schedule, expiresAt };
 }
 
 function compactJob(job: JobRow) {
 	return {
 		id: job.id,
 		name: job.name,
-		scheduleSummary: describeSchedule(job.schedule, job.timezone),
+		scheduleSummary:
+			job.schedule === undefined
+				? null
+				: describeSchedule(job.schedule, job.timezone),
+		trigger: job.trigger,
 		enabled: job.enabled,
 		nextRunAt: job.nextRunAt,
 		lastRunStatus: job.lastRunStatus,
@@ -286,7 +323,7 @@ export const jobs: Capability[] = [
 	{
 		name: "job_create",
 		description:
-			"Create a job: a script that runs unattended on a schedule with ayo.* capabilities in scope. Confirm-before-act: the first call returns the scheduled script and real expiry as a preview plus confirmId; after approval, call again with only confirmId",
+			"Create unattended automation on a schedule or in reaction to an event—for example: when an email arrives, tag it. The automation can call ayo.* capabilities. Confirm-before-act: the first call returns the automation, schedule or trigger, and real expiry as a preview plus confirmId; after approval, call again with only confirmId",
 		inputSchema: createJobSchema,
 		keywords: [
 			"run every morning at 8",
@@ -294,6 +331,9 @@ export const jobs: Capability[] = [
 			"create recurring automation",
 			"cron job",
 			"run later without a host",
+			"when an email arrives",
+			"when new mail comes in",
+			"event triggered job",
 		],
 		handler: async (rawInput, { env, props }) => {
 			const input = rawInput as z.infer<typeof createJobSchema>;
@@ -308,7 +348,7 @@ export const jobs: Capability[] = [
 	{
 		name: "job_list",
 		description:
-			"List the unattended jobs that are scheduled, including whether each is enabled, its next run, last status, and run count",
+			"List unattended scheduled and event-triggered jobs, including whether each is enabled, its schedule or trigger, next run, last status, and run count",
 		inputSchema: z.object({}),
 		keywords: [
 			"what jobs are scheduled",
@@ -322,7 +362,7 @@ export const jobs: Capability[] = [
 	{
 		name: "job_read",
 		description:
-			"Read one scheduled job in full, including its unattended script, owner properties, schedule, expiry, run counters, and ten most recent run records",
+			"Read one unattended job in full, including its script, owner properties, schedule or event trigger, expiry, run counters, and ten most recent run records",
 		inputSchema: jobIdSchema,
 		keywords: [
 			"inspect scheduled job",
@@ -340,7 +380,7 @@ export const jobs: Capability[] = [
 	{
 		name: "job_update",
 		description:
-			"Change, pause, resume, or reschedule an unattended job. Confirm-before-act: the first call previews the merged job plus confirmId; after approval, call again with only confirmId",
+			"Change the schedule or trigger for this automation, or pause, resume, and edit it. Confirm-before-act: the first call previews the merged job plus confirmId; after approval, call again with only confirmId",
 		inputSchema: updateJobSchema,
 		keywords: [
 			"pause that job",
@@ -368,7 +408,7 @@ export const jobs: Capability[] = [
 	{
 		name: "job_delete",
 		description:
-			"Delete a scheduled job so its unattended script cannot run again",
+			"Remove this scheduled or event-triggered automation so its unattended script cannot run again",
 		inputSchema: jobIdSchema,
 		keywords: [
 			"delete the daily brief job",

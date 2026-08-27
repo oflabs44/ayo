@@ -1,3 +1,4 @@
+import { DynamicWorkerExecutor } from "@cloudflare/codemode";
 import type { Capability } from "./capabilities";
 import { capabilities } from "./capabilities";
 import type { Env, OwnerProps } from "./env";
@@ -24,7 +25,6 @@ export async function executeCode(input: {
 		};
 	}
 
-	const { DynamicWorkerExecutor } = await import("@cloudflare/codemode");
 	const executor = new DynamicWorkerExecutor({
 		loader: input.env.LOADER,
 		timeout: TIMEOUT_MS,
