@@ -202,9 +202,14 @@ export async function runTriggeredJobs(
 	const failedJobIds: string[] = [];
 
 	for (const job of jobs) {
+		const eventAccount =
+			typeof event.account === "string" ? event.account : undefined;
 		if (
 			job.trigger?.source !== source ||
-			(job.trigger.kind !== undefined && job.trigger.kind !== event.kind)
+			(job.trigger.kind !== undefined && job.trigger.kind !== event.kind) ||
+			(job.trigger.accounts !== undefined &&
+				(eventAccount === undefined ||
+					!job.trigger.accounts.includes(eventAccount)))
 		) {
 			continue;
 		}

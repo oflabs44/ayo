@@ -66,6 +66,69 @@ afterEach(() => {
 });
 
 describe("triggered job runner", () => {
+	it("matches the accounts list when set and every account when omitted", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(now);
+		const { env, ctx, waits } = createHarness();
+		await createJob(
+			env,
+			job({
+				id: "account-match",
+				schedule: undefined,
+				trigger: {
+					source: "bureau",
+					accounts: ["ola@4wardthinkers.com", "second@example.com"],
+				},
+				nextRunAt: null,
+			}),
+		);
+		await createJob(
+			env,
+			job({
+				id: "account-mismatch",
+				schedule: undefined,
+				trigger: { source: "bureau", accounts: ["other@example.com"] },
+				nextRunAt: null,
+			}),
+		);
+		await createJob(
+			env,
+			job({
+				id: "all-accounts",
+				schedule: undefined,
+				trigger: { source: "bureau" },
+				nextRunAt: null,
+			}),
+		);
+		const execute = vi.fn(async () => ({ logs: [] }));
+		const event = {
+			id: "event-acct",
+			kind: "mail.received",
+			account: "ola@4wardthinkers.com",
+			data: { id: "m1" },
+		};
+
+		await runTriggeredJobs(env, ctx, "bureau", event, execute);
+		await settle(waits);
+
+		expect(execute).toHaveBeenCalledTimes(2);
+		expect(await getJob(env, "account-match")).toMatchObject({ runCount: 1 });
+		expect(await getJob(env, "account-mismatch")).toMatchObject({
+			runCount: 0,
+		});
+		expect(await getJob(env, "all-accounts")).toMatchObject({ runCount: 1 });
+
+		const accountless = {
+			id: "event-anon",
+			kind: "mail.received",
+			data: { id: "m2" },
+		};
+		await runTriggeredJobs(env, ctx, "bureau", accountless, execute);
+		await settle(waits);
+		expect(await getJob(env, "account-match")).toMatchObject({ runCount: 1 });
+		expect(await getJob(env, "all-accounts")).toMatchObject({ runCount: 2 });
+	});
+
 	it("matches source and optional kind while skipping disabled and expired jobs", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);

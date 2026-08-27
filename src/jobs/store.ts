@@ -12,6 +12,8 @@ export type JobRunSource = "schedule" | "manual";
 export type JobTrigger = {
 	source: string;
 	kind?: string;
+	/** Omitted means every account; set means only events whose account is listed. */
+	accounts?: string[];
 };
 
 export type JobRow = {
@@ -133,16 +135,27 @@ function parseSchedule(serialized: string): JobSchedule | undefined {
 function parseTrigger(serialized: string | null): JobTrigger | undefined {
 	if (serialized === null) return undefined;
 	const trigger = JSON.parse(serialized) as Record<string, unknown>;
+	const accountsValid =
+		trigger.accounts === undefined ||
+		(Array.isArray(trigger.accounts) &&
+			trigger.accounts.length > 0 &&
+			trigger.accounts.every(
+				(entry) => typeof entry === "string" && entry.length > 0,
+			));
 	if (
 		typeof trigger.source !== "string" ||
 		trigger.source.length === 0 ||
-		(trigger.kind !== undefined && typeof trigger.kind !== "string")
+		(trigger.kind !== undefined && typeof trigger.kind !== "string") ||
+		!accountsValid
 	) {
 		throw new Error("trigger_json does not contain a supported job trigger");
 	}
 	return {
 		source: trigger.source,
 		...(trigger.kind === undefined ? {} : { kind: trigger.kind }),
+		...(trigger.accounts === undefined
+			? {}
+			: { accounts: trigger.accounts as string[] }),
 	};
 }
 

@@ -64,6 +64,8 @@ const scheduleSchema = z.discriminatedUnion("type", [
 const triggerSchema = z.object({
 	source: z.string().min(1),
 	kind: z.string().optional(),
+	// Omitted means every account the source delivers for.
+	accounts: z.array(z.string().min(1)).min(1).optional(),
 });
 const expiresAtSchema = z.iso.datetime({ offset: true }).nullable();
 const createPayloadSchema = z
