@@ -83,6 +83,13 @@ type BureauTodo = {
 	priority: number | null;
 	etag: string;
 };
+type BureauTag = {
+	id: string;
+	name: string;
+	keyword: string;
+	color: string | null;
+	createdAt: string;
+};
 type BureauContact = {
 	id: string;
 	addressbook: string;
@@ -144,15 +151,14 @@ export type BureauBinding = {
 	}): Promise<Array<{ version: string; updatedAt: string }>>;
 	deleteNotebookDoc(input: { path: string }): Promise<boolean>;
 	listAccounts(input: Record<string, never>): Promise<unknown[]>;
-	listTags(input: Record<string, never>): Promise<
-		Array<{
-			id: string;
-			name: string;
-			keyword: string;
-			color: string | null;
-			createdAt: string;
-		}>
-	>;
+	listTags(input: Record<string, never>): Promise<BureauTag[]>;
+	createTag(input: { name: string; color?: string }): Promise<BureauTag>;
+	updateTag(input: {
+		id: string;
+		name?: string;
+		color?: string | null;
+	}): Promise<BureauTag>;
+	deleteTag(input: { id: string }): Promise<{ id: string }>;
 	listThreads(input: {
 		address: string;
 		folder?: string;

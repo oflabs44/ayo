@@ -11,7 +11,19 @@ const props: OwnerProps = {
 
 function createHarness() {
 	const drafts = new Map<string, string>();
+	const staged = new Map<string, string>();
 	const bureau = {
+		createTag: vi.fn(async () => ({
+			id: "66666666-6666-4666-8666-666666666666",
+			name: "Receipts",
+			keyword: "Receipts",
+			color: null,
+			createdAt: "2026-08-27T00:00:00Z",
+		})),
+		updateTag: vi.fn(),
+		deleteTag: vi.fn(async () => ({
+			id: "55555555-5555-4555-8555-555555555555",
+		})),
 		listTags: vi.fn(async () => [
 			{
 				id: "55555555-5555-4555-8555-555555555555",
@@ -48,9 +60,19 @@ function createHarness() {
 	const env = {
 		BUREAU: bureau,
 		OAUTH_KV: {
-			get: vi.fn(async (key: string) => drafts.get(key) ?? null),
-			put,
-			delete: deleteDraft,
+			get: vi.fn(
+				async (key: string) => drafts.get(key) ?? staged.get(key) ?? null,
+			),
+			put: vi.fn(
+				async (key: string, value: string, options?: { expirationTtl: number }) => {
+					if (key.startsWith("confirm:")) staged.set(key, value);
+					else await put(key, value, options);
+				},
+			),
+			delete: vi.fn(async (key: string) => {
+				if (key.startsWith("confirm:")) staged.delete(key);
+				else await deleteDraft(key);
+			}),
 		},
 	} as unknown as Env;
 
@@ -82,6 +104,90 @@ describe("email capabilities", () => {
 			address: "oladayo@example.com",
 			tag: "55555555-5555-4555-8555-555555555555",
 		});
+	});
+
+	it("creates and deletes tags only through the confirmation gate", async () => {
+		const { bureau, dispatch } = createHarness();
+
+		const stagedCreate = (await dispatch.email_tag_create!({
+			name: "Receipts",
+		})) as { confirmId: string; created: boolean };
+		expect(stagedCreate.created).toBe(false);
+		expect(bureau.createTag).not.toHaveBeenCalled();
+
+		await expect(
+			dispatch.email_tag_create!({ confirmId: stagedCreate.confirmId }),
+		).resolves.toMatchObject({ created: true });
+		expect(bureau.createTag).toHaveBeenCalledWith({ name: "Receipts" });
+
+		const stagedDelete = (await dispatch.email_tag_delete!({
+			id: "55555555-5555-4555-8555-555555555555",
+		})) as { confirmId: string; preview: unknown };
+		expect(stagedDelete.preview).toEqual({
+			id: "55555555-5555-4555-8555-555555555555",
+			name: "Receipts",
+			keyword: "AyoReceipts",
+		});
+		expect(bureau.deleteTag).not.toHaveBeenCalled();
+
+		await expect(
+			dispatch.email_tag_delete!({ confirmId: stagedDelete.confirmId }),
+		).resolves.toEqual({
+			deleted: true,
+			id: "55555555-5555-4555-8555-555555555555",
+		});
+
+		const reused = (await dispatch.email_tag_delete!({
+			confirmId: stagedDelete.confirmId,
+		})) as { deleted: boolean; error: string };
+		expect(reused.deleted).toBe(false);
+		expect(reused.error).toContain("unknown or expired");
+	});
+
+	it("updates a tag only through the confirmation gate", async () => {
+		const { bureau, dispatch } = createHarness();
+		vi.mocked(bureau.updateTag).mockResolvedValueOnce({
+			id: "55555555-5555-4555-8555-555555555555",
+			name: "Invoices",
+			keyword: "AyoReceipts",
+			color: "#112233",
+			createdAt: "2026-08-27T00:00:00Z",
+		});
+
+		const stagedUpdate = (await dispatch.email_tag_update!({
+			id: "55555555-5555-4555-8555-555555555555",
+			name: "Invoices",
+			color: "#112233",
+		})) as { confirmId: string; updated: boolean; preview: unknown };
+		expect(stagedUpdate.updated).toBe(false);
+		expect(bureau.updateTag).not.toHaveBeenCalled();
+
+		await expect(
+			dispatch.email_tag_update!({ confirmId: stagedUpdate.confirmId }),
+		).resolves.toMatchObject({ updated: true });
+		expect(bureau.updateTag).toHaveBeenCalledWith({
+			id: "55555555-5555-4555-8555-555555555555",
+			name: "Invoices",
+			color: "#112233",
+		});
+
+		const reused = (await dispatch.email_tag_update!({
+			confirmId: stagedUpdate.confirmId,
+		})) as { updated: boolean; error: string };
+		expect(reused.updated).toBe(false);
+		expect(reused.error).toContain("unknown or expired");
+		expect(bureau.updateTag).toHaveBeenCalledTimes(1);
+	});
+
+	it("refuses to stage deleting an unknown tag", async () => {
+		const { bureau, dispatch } = createHarness();
+
+		const result = (await dispatch.email_tag_delete!({
+			id: "99999999-9999-4999-8999-999999999999",
+		})) as { deleted: boolean; error: string };
+		expect(result.deleted).toBe(false);
+		expect(result.error).toContain("No tag");
+		expect(bureau.deleteTag).not.toHaveBeenCalled();
 	});
 
 	it("stores the user-facing preview and maps its body only when sending", async () => {
