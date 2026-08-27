@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Env, OwnerProps } from "../env";
 import { ai } from "./ai";
 import { calendar } from "./calendar";
+import { contacts } from "./contacts";
 import { email } from "./email";
 import { memory } from "./memory";
 import { meta } from "./meta";
@@ -49,6 +50,10 @@ export const capabilityRegistry = {
 	tasks: {
 		description: "List, read, create, update, and delete tasks",
 		capabilities: tasks,
+	},
+	contacts: {
+		description: "Look up, save, and remove people in the address book",
+		capabilities: contacts,
 	},
 	ai: {
 		description: "Run a model to judge, classify, or summarize something",

@@ -5,7 +5,15 @@ export const EMBEDDING_MAX_INPUT_CHARS = 2_000;
 export const RRF_CONSTANT = 60;
 
 function tokenize(value: string): Set<string> {
-	return new Set(value.toLowerCase().match(/[a-z0-9]+/g) ?? []);
+	// Possessives shed shrapnel ("timi's" -> "s") that creates false overlap;
+	// strip the suffix instead of dropping all single characters, which would
+	// collapse meaningful labels like "plan a" vs "plan b".
+	return new Set(
+		value
+			.toLowerCase()
+			.replaceAll(/['’]s\b/g, "")
+			.match(/[a-z0-9]+/g) ?? [],
+	);
 }
 
 function tokenOverlap(queryTokens: Set<string>, document: string): number {

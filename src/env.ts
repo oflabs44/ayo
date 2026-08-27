@@ -83,6 +83,19 @@ type BureauTodo = {
 	priority: number | null;
 	etag: string;
 };
+type BureauContact = {
+	id: string;
+	addressbook: string;
+	fn: string | null;
+	emails: Array<Record<string, unknown>>;
+	tels: Array<Record<string, unknown>>;
+	etag: string;
+} & Record<string, unknown>;
+type BureauContactWrite = {
+	address: string;
+	addressbook: string;
+	fn: string;
+} & Record<string, unknown>;
 type BureauAlarm = {
 	trigger: string;
 	action?: "DISPLAY" | "EMAIL" | "AUDIO";
@@ -217,6 +230,21 @@ export type BureauBinding = {
 	createTodo(input: BureauTodoCreate): Promise<BureauTodo>;
 	updateTodo(input: BureauTodoUpdate): Promise<BureauTodo>;
 	removeTodo(input: {
+		address: string;
+		id: string;
+		etag?: string;
+	}): Promise<{ id: string }>;
+	listContacts(input: {
+		address: string;
+		q?: string;
+		addressbook?: string;
+	}): Promise<BureauContact[]>;
+	getContact(input: {
+		address: string;
+		id: string;
+	}): Promise<BureauContact & { raw: string }>;
+	createContact(input: BureauContactWrite): Promise<BureauContact>;
+	removeContact(input: {
 		address: string;
 		id: string;
 		etag?: string;

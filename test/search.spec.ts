@@ -71,6 +71,17 @@ describe("capability search", () => {
 					],
 				},
 				{
+					domain: "contacts",
+					description:
+						"Look up, save, and remove people in the address book",
+					capabilities: [
+						"contact_find",
+						"contact_read",
+						"contact_create",
+						"contact_delete",
+					],
+				},
+				{
 					domain: "ai",
 					description:
 						"Run a model to judge, classify, or summarize something",
@@ -189,6 +200,10 @@ describe("capability search", () => {
 					expect.stringContaining("task_create\ntasks"),
 					expect.stringContaining("task_update\ntasks"),
 					expect.stringContaining("task_delete\ntasks"),
+					expect.stringContaining("contact_find\ncontacts"),
+					expect.stringContaining("contact_read\ncontacts"),
+					expect.stringContaining("contact_create\ncontacts"),
+					expect.stringContaining("contact_delete\ncontacts"),
 					expect.stringContaining("ai_run\nai"),
 				],
 			},
@@ -316,12 +331,28 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:contact_find",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:contact_read",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:contact_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:contact_delete",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:ai_run",
 				namespace: "capabilities",
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 30,
+			topK: 34,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(
