@@ -96,11 +96,16 @@ export const calendar: Capability[] = [
 		name: "calendar_calendars",
 		description: "Find which calendars are available in an email account",
 		inputSchema: accountSchema,
+		// No "calendar folders" here. Once email_mailboxes existed, that keyword
+		// took "what are my mail folders" and "show me my email folders" to the
+		// calendar - restoring it fails those golden queries. The cost is real and
+		// unguarded: folder-language calendar queries now tie among the calendar
+		// capabilities, and no golden query can pin them because none wins on
+		// score. Ayo's calendars are not folders, so the word belongs to mail.
 		keywords: [
 			"list calendars",
 			"list my calendars",
 			"available calendars",
-			"calendar folders",
 			"choose a calendar",
 		],
 		handler: async (input, { env }) => {

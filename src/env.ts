@@ -36,6 +36,20 @@ type BureauThread = { messages: BureauMessageSummary[] } & Record<
 	unknown
 >;
 type BureauRecipient = { address: string; name?: string };
+type BureauMailbox = {
+	path: string;
+	name: string;
+	/** One of Bureau's SPECIAL_USE_ATTRIBUTES; never \Inbox, which IMAP has no
+	 * attribute for. INBOX is identified by its path. */
+	specialUse: string | null;
+	delimiter: string;
+	/** \Noselect: a naming node that cannot be SELECTed, so not a move target. */
+	noselect: boolean;
+	/** Present only when the server advertises LIST-STATUS (RFC 5819);
+	 * absent is not zero. */
+	messages?: number;
+	unseen?: number;
+};
 type BureauCalendar = {
 	id: string;
 	account: string;
@@ -151,6 +165,7 @@ export type BureauBinding = {
 	}): Promise<Array<{ version: string; updatedAt: string }>>;
 	deleteNotebookDoc(input: { path: string }): Promise<boolean>;
 	listAccounts(input: Record<string, never>): Promise<unknown[]>;
+	listMailboxes(input: { address: string }): Promise<BureauMailbox[]>;
 	listTags(input: Record<string, never>): Promise<BureauTag[]>;
 	createTag(input: { name: string; color?: string }): Promise<BureauTag>;
 	updateTag(input: {

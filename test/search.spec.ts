@@ -1,10 +1,32 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/env";
 import { searchCapabilities } from "../src/search";
+import { identityBodyScore } from "../src/search-support";
 
 const offlineEnv = { SEARCH_OFFLINE: "true" } as Env;
 
 describe("capability search", () => {
+	it("counts a matched function word for less than a content word", () => {
+		// Pins the weighting itself, not a ranking outcome: the end-to-end claim
+		// belongs to the golden queries. Without the downweighting these two
+		// scores are exactly equal.
+		const query = "what are my mail folders";
+		const content = identityBodyScore(
+			query,
+			"email_mailboxes",
+			"folders",
+			true,
+		);
+		const scaffolding = identityBodyScore(
+			query,
+			"email_mailboxes",
+			"what",
+			true,
+		);
+
+		expect(content).toBeGreaterThan(scaffolding);
+	});
+
 	it("returns a domain overview for a blank query", async () => {
 		expect(await searchCapabilities("  \n", offlineEnv)).toEqual({
 			domains: [
@@ -37,6 +59,7 @@ describe("capability search", () => {
 					domain: "email",
 					description: "Search, read, draft, send, move, and flag email",
 					capabilities: [
+						"email_mailboxes",
 						"email_tags",
 						"email_tag_create",
 						"email_tag_update",
@@ -200,6 +223,7 @@ describe("capability search", () => {
 					expect.stringContaining("memory_remember\nmemory"),
 					expect.stringContaining("memory_recall\nmemory"),
 					expect.stringContaining("memory_forget\nmemory"),
+					expect.stringContaining("email_mailboxes\nemail"),
 					expect.stringContaining("email_tags\nemail"),
 					expect.stringContaining("email_tag_create\nemail"),
 					expect.stringContaining("email_tag_update\nemail"),
@@ -284,6 +308,10 @@ describe("capability search", () => {
 			}),
 			expect.objectContaining({
 				id: "capability:memory_forget",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:email_mailboxes",
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
@@ -420,7 +448,7 @@ describe("capability search", () => {
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 44,
+			topK: 45,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(

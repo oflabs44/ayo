@@ -36,26 +36,22 @@ function capabilityText(capability: RegisteredCapability): string {
 	].join("\n");
 }
 
-function lexicalScore(
-	capability: RegisteredCapability,
-	query: string,
-): number {
-	return identityBodyScore(
-		query,
-		capability.name,
-		[
-			capability.description,
-			...(capability.keywords ?? []),
-			capability.domain,
-		].join("\n"),
-	);
-}
+// Precomputed once: the registry is static, and rebuilding these strings per
+// query was the old lexicalScore's only real cost.
+const lexicalIndex = capabilities.map((capability) => ({
+	capability,
+	body: [
+		capability.description,
+		...(capability.keywords ?? []),
+		capability.domain,
+	].join("\n"),
+}));
 
 function lexicalRanking(query: string): RegisteredCapability[] {
-	return capabilities
-		.map((capability) => ({
+	return lexicalIndex
+		.map(({ capability, body }) => ({
 			capability,
-			score: lexicalScore(capability, query),
+			score: identityBodyScore(query, capability.name, body, true),
 		}))
 		.filter(({ score }) => score > 0)
 		.sort((left, right) => right.score - left.score)

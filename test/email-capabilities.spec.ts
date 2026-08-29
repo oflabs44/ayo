@@ -36,6 +36,32 @@ function createHarness() {
 		listAccounts: vi.fn(async () => [
 			{ address: "oladayo@example.com", primary: true },
 		]),
+		listMailboxes: vi.fn(async () => [
+			{
+				path: "INBOX",
+				// Bureau has no \Inbox attribute: the inbox is the INBOX path.
+				name: "INBOX",
+				specialUse: null,
+				delimiter: "/",
+				noselect: false,
+				messages: 12,
+				unseen: 3,
+			},
+			{
+				path: "Archive",
+				name: "Archive",
+				specialUse: null,
+				delimiter: "/",
+				noselect: true,
+			},
+			{
+				path: "Archive/2026",
+				name: "2026",
+				specialUse: "\\Archive",
+				delimiter: "/",
+				noselect: false,
+			},
+		]),
 		listThreads: vi.fn(async () => []),
 		listMessages: vi.fn(async () => []),
 		getThread: vi.fn(),
@@ -443,5 +469,35 @@ describe("email capabilities", () => {
 			add: ["\\Flagged"],
 			remove: ["\\Seen"],
 		});
+	});
+
+	it("lists the account's mailboxes so a folder path can be chosen", async () => {
+		const { bureau, dispatch } = createHarness();
+
+		const mailboxes = (await dispatch.email_mailboxes!({
+			address: "oladayo@example.com",
+		})) as Array<{ path: string; specialUse: string | null; noselect: boolean }>;
+
+		// Passed through unfiltered, noselect included: the description tells the
+		// agent what noselect means rather than hiding a real mailbox path.
+		expect(mailboxes.map((mailbox) => mailbox.path)).toEqual([
+			"INBOX",
+			"Archive",
+			"Archive/2026",
+		]);
+		expect(mailboxes[0]?.specialUse).toBeNull();
+		expect(mailboxes[1]?.noselect).toBe(true);
+		expect(mailboxes[2]?.specialUse).toBe("\\Archive");
+		expect(bureau.listMailboxes).toHaveBeenCalledWith({
+			address: "oladayo@example.com",
+		});
+	});
+
+	it("reports the missing backend rather than throwing", async () => {
+		const dispatch = buildDispatchTable(email, {} as Env, props);
+
+		await expect(
+			dispatch.email_mailboxes!({ address: "oladayo@example.com" }),
+		).resolves.toEqual({ error: "The email backend is not configured." });
 	});
 });
