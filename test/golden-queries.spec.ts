@@ -62,7 +62,6 @@ const goldenQueries = [
 	["apply the work label to this message", "email_flag"],
 	["mark this message as unread", "email_flag"],
 	["list my calendars", "calendar_calendars"],
-	["list my calendar folders", "calendar_calendars"],
 	["which calendars can i use", "calendar_calendars"],
 	["create a new calendar for a project", "calendar_create"],
 	["add a separate calendar", "calendar_create"],

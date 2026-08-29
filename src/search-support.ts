@@ -17,19 +17,21 @@ function tokenize(value: string): Set<string> {
 }
 
 /**
- * Uniform weighting counts "my" and "mailbox" the same, so a question-shaped
+ * Uniform weighting counts "are" and "mailbox" the same, so a question-shaped
  * query is decided by its scaffolding: "what are my mail folders" matched
- * accounts_list on `my` + `mail` and beat the capability that owns `folders`,
+ * accounts_list on `are` + `mail` and beat the capability that owns `folders`,
  * and "remove that mail label" was won by `that`.
  *
- * Inverse document frequency does not fix this. Across 45 terse capability
- * descriptions a function word like `that` or `browse` is genuinely rarer than
- * `mail`, so rarity weighting promotes exactly the tokens that carry no intent.
- * Function words are a closed class, so name them instead of inferring them.
+ * Inverse document frequency does not fix this. Across a few dozen terse
+ * capability descriptions a function word like `that` or `whose` is genuinely
+ * rarer than `mail`, so rarity weighting promotes exactly the tokens that carry
+ * no intent. Function words are a closed class, so name them instead.
  *
- * Deliberately excludes verbs that distinguish one capability from another -
- * show, list, find, read, send, move, make, new - and words that are content in
- * this domain, such as "next" for a calendar query.
+ * A word belongs here when it shows up in queries across every domain and never
+ * selects between capabilities. Light verbs qualify - `get` and `have` carry no
+ * intent on their own - while `show`, `list`, `find`, `read`, `send` and `move`
+ * do not, because each names something a capability actually does. Neither do
+ * words that are content in this domain, such as "next" for a calendar query.
  */
 const STOPWORDS = new Set([
 	"a", "all", "an", "and", "any", "are", "as", "at", "be", "been", "but", "by",
@@ -42,9 +44,9 @@ const STOPWORDS = new Set([
 	"would", "you", "your", "yours",
 ]);
 
-// A calibration knob, midpoint of the band the golden queries accept (0.45 to
-// 0.9; 1.0 loses the mail-folder queries, 0.35 loses "remember to renew my
-// passport", where "to" is what separates a task from a memory). Deliberately
+// A calibration knob, near the middle of the band the golden queries accept
+// (0.45 to 0.9; 1.0 loses the mail-folder queries, 0.35 loses "remember to renew
+// my passport", where "to" separates a task from a memory). Deliberately
 // not zero: dropping function words outright costs those distinctions, and a
 // query that is nothing but function words should still rank something rather
 // than collapse to an empty result.

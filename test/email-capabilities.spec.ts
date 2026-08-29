@@ -39,8 +39,9 @@ function createHarness() {
 		listMailboxes: vi.fn(async () => [
 			{
 				path: "INBOX",
+				// Bureau has no \Inbox attribute: the inbox is the INBOX path.
 				name: "INBOX",
-				specialUse: "\\Inbox",
+				specialUse: null,
 				delimiter: "/",
 				noselect: false,
 				messages: 12,
@@ -56,7 +57,7 @@ function createHarness() {
 			{
 				path: "Archive/2026",
 				name: "2026",
-				specialUse: null,
+				specialUse: "\\Archive",
 				delimiter: "/",
 				noselect: false,
 			},
@@ -484,14 +485,15 @@ describe("email capabilities", () => {
 			"Archive",
 			"Archive/2026",
 		]);
-		expect(mailboxes[0]?.specialUse).toBe("\\Inbox");
+		expect(mailboxes[0]?.specialUse).toBeNull();
 		expect(mailboxes[1]?.noselect).toBe(true);
+		expect(mailboxes[2]?.specialUse).toBe("\\Archive");
 		expect(bureau.listMailboxes).toHaveBeenCalledWith({
 			address: "oladayo@example.com",
 		});
 	});
 
-	it("reports the missing backend instead of calling Bureau", async () => {
+	it("reports the missing backend rather than throwing", async () => {
 		const dispatch = buildDispatchTable(email, {} as Env, props);
 
 		await expect(

@@ -39,9 +39,14 @@ type BureauRecipient = { address: string; name?: string };
 type BureauMailbox = {
 	path: string;
 	name: string;
+	/** One of Bureau's SPECIAL_USE_ATTRIBUTES; never \Inbox, which IMAP has no
+	 * attribute for. INBOX is identified by its path. */
 	specialUse: string | null;
 	delimiter: string;
+	/** \Noselect: a naming node that cannot be SELECTed, so not a move target. */
 	noselect: boolean;
+	/** Present only when the server advertises LIST-STATUS (RFC 5819);
+	 * absent is not zero. */
 	messages?: number;
 	unseen?: number;
 };

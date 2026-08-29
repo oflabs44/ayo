@@ -93,11 +93,8 @@ export const email: Capability[] = [
 	{
 		name: "email_mailboxes",
 		description:
-			"List the mail folders in an account: each mailbox's path, display name, hierarchy delimiter, and special-use role such as inbox, sent, archive, or trash. email_move and email_search expect one of these folder paths, except one marked noselect - that is a naming node in the hierarchy and cannot hold mail",
+			"List the mail folders in an account: each mailbox's path, display name, hierarchy delimiter, and special-use role - \\Sent, \\Drafts, \\Archive, \\Junk, \\Trash, \\All or \\Flagged, or null. The inbox has no role: it is the mailbox at path INBOX. email_move and email_search expect one of these paths, except one marked noselect - that is a naming node in the hierarchy and cannot hold mail",
 		inputSchema: accountSchema,
-		// Keywords stay content-dense. The lexical scorer only downweights function
-		// words, so a keyword phrased as a question still lends "which" or "have"
-		// to every query carrying them.
 		keywords: [
 			"list mail folders",
 			"mailbox names",
