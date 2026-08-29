@@ -100,7 +100,6 @@ export const calendar: Capability[] = [
 			"list calendars",
 			"list my calendars",
 			"available calendars",
-			"calendar folders",
 			"choose a calendar",
 		],
 		handler: async (input, { env }) => {

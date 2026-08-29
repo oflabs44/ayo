@@ -91,6 +91,25 @@ function draftKey(draftId: string): string {
 
 export const email: Capability[] = [
 	{
+		name: "email_mailboxes",
+		description:
+			"List the mail folders in an account: each mailbox's path, display name, hierarchy delimiter, and special-use role such as inbox, sent, archive, or trash. email_move and email_search expect one of these folder paths, except one marked noselect - that is a naming node in the hierarchy and cannot hold mail",
+		inputSchema: accountSchema,
+		// Keywords stay content-dense. The lexical scorer only downweights function
+		// words, so a keyword phrased as a question still lends "which" or "have"
+		// to every query carrying them.
+		keywords: [
+			"list mail folders",
+			"mailbox names",
+			"imap folders",
+			"folder paths for filing mail",
+		],
+		handler: async (input, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			return env.BUREAU.listMailboxes(input as z.infer<typeof accountSchema>);
+		},
+	},
+	{
 		name: "email_tags",
 		description:
 			"List the mail tag registry: each tag's id, display name, color, and the IMAP keyword that email_flag applies or removes",
@@ -249,7 +268,7 @@ export const email: Capability[] = [
 	{
 		name: "email_search",
 		description:
-			"Find email threads or messages in an account; use accounts_list to find valid addresses and email_tags to filter threads by tag",
+			"Find email threads or messages in an account; use accounts_list to find valid addresses, email_mailboxes for folder names, and email_tags to filter threads by tag",
 		inputSchema: searchInputSchema,
 		keywords: [
 			"search email",
@@ -348,7 +367,8 @@ export const email: Capability[] = [
 	},
 	{
 		name: "email_move",
-		description: "Move an email message to another mailbox",
+		description:
+			"Move an email message to another mailbox; email_mailboxes lists the folder paths this accepts",
 		inputSchema: moveInputSchema,
 		keywords: [
 			"move email",

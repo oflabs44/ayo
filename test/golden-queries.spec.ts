@@ -4,6 +4,11 @@ import { searchCapabilities } from "../src/search";
 
 const offlineEnv = { SEARCH_OFFLINE: "true" } as Env;
 
+// Each pair must be won on score, not on registry order. A phrasing that only
+// ties and resolves by declaration order is false coverage: it passes for the
+// whole calibrated band of STOPWORD_WEIGHT and flips when a capability is added
+// above it. Verify a new pair by moving its capability to the end of its domain
+// array and confirming the test still passes.
 const goldenQueries = [
 	["who am i", "whoami"],
 	["what can you do", "overview"],
@@ -30,6 +35,10 @@ const goldenQueries = [
 	["remove this fact from memory", "memory_forget"],
 	["which email accounts do you have", "accounts_list"],
 	["list my mail accounts", "accounts_list"],
+	["list my mail folders", "email_mailboxes"],
+	["which folder is my archive", "email_mailboxes"],
+	["what are my mail folders", "email_mailboxes"],
+	["what mail folders do i have", "email_mailboxes"],
 	["which email tags exist", "email_tags"],
 	["make a new tag for receipts", "email_tag_create"],
 	["add an email tag", "email_tag_create"],
@@ -53,6 +62,7 @@ const goldenQueries = [
 	["apply the work label to this message", "email_flag"],
 	["mark this message as unread", "email_flag"],
 	["list my calendars", "calendar_calendars"],
+	["list my calendar folders", "calendar_calendars"],
 	["which calendars can i use", "calendar_calendars"],
 	["create a new calendar for a project", "calendar_create"],
 	["add a separate calendar", "calendar_create"],
