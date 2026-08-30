@@ -104,6 +104,15 @@ type BureauTag = {
 	color: string | null;
 	createdAt: string;
 };
+type BureauMailbox = {
+	path: string;
+	name: string;
+	specialUse: string | null;
+	delimiter: string;
+	noselect: boolean;
+	messages?: number;
+	unseen?: number;
+};
 type BureauContact = {
 	id: string;
 	addressbook: string;
@@ -166,6 +175,19 @@ export type BureauBinding = {
 	deleteNotebookDoc(input: { path: string }): Promise<boolean>;
 	listAccounts(input: Record<string, never>): Promise<unknown[]>;
 	listMailboxes(input: { address: string }): Promise<BureauMailbox[]>;
+	createMailbox(input: {
+		address: string;
+		path: string;
+	}): Promise<{ path: string }>;
+	renameMailbox(input: {
+		address: string;
+		path: string;
+		to: string;
+	}): Promise<{ path: string }>;
+	deleteMailbox(input: {
+		address: string;
+		path: string;
+	}): Promise<{ path: string }>;
 	listTags(input: Record<string, never>): Promise<BureauTag[]>;
 	createTag(input: { name: string; color?: string }): Promise<BureauTag>;
 	updateTag(input: {

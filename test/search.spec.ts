@@ -57,9 +57,13 @@ describe("capability search", () => {
 				},
 				{
 					domain: "email",
-					description: "Search, read, draft, send, move, and flag email",
+					description:
+						"Manage folders and search, read, draft, send, move, and flag email",
 					capabilities: [
 						"email_mailboxes",
+						"email_mailbox_create",
+						"email_mailbox_rename",
+						"email_mailbox_delete",
 						"email_tags",
 						"email_tag_create",
 						"email_tag_update",
@@ -224,6 +228,9 @@ describe("capability search", () => {
 					expect.stringContaining("memory_recall\nmemory"),
 					expect.stringContaining("memory_forget\nmemory"),
 					expect.stringContaining("email_mailboxes\nemail"),
+					expect.stringContaining("email_mailbox_create\nemail"),
+					expect.stringContaining("email_mailbox_rename\nemail"),
+					expect.stringContaining("email_mailbox_delete\nemail"),
 					expect.stringContaining("email_tags\nemail"),
 					expect.stringContaining("email_tag_create\nemail"),
 					expect.stringContaining("email_tag_update\nemail"),
@@ -312,6 +319,18 @@ describe("capability search", () => {
 			}),
 			expect.objectContaining({
 				id: "capability:email_mailboxes",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:email_mailbox_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:email_mailbox_rename",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:email_mailbox_delete",
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
@@ -449,6 +468,7 @@ describe("capability search", () => {
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
 			topK: 45,
+			topK: 48,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(

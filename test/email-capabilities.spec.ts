@@ -13,6 +13,9 @@ function createHarness() {
 	const drafts = new Map<string, string>();
 	const staged = new Map<string, string>();
 	const bureau = {
+		createMailbox: vi.fn(async ({ path }: { path: string }) => ({ path })),
+		renameMailbox: vi.fn(async ({ to }: { to: string }) => ({ path: to })),
+		deleteMailbox: vi.fn(async ({ path }: { path: string }) => ({ path })),
 		createTag: vi.fn(async () => ({
 			id: "66666666-6666-4666-8666-666666666666",
 			name: "Receipts",
@@ -83,6 +86,9 @@ function createHarness() {
 	const deleteDraft = vi.fn(async (key: string) => {
 		drafts.delete(key);
 	});
+	const deleteConfirmation = vi.fn(async (key: string) => {
+		staged.delete(key);
+	});
 	const env = {
 		BUREAU: bureau,
 		OAUTH_KV: {
@@ -96,7 +102,7 @@ function createHarness() {
 				},
 			),
 			delete: vi.fn(async (key: string) => {
-				if (key.startsWith("confirm:")) staged.delete(key);
+				if (key.startsWith("confirm:")) await deleteConfirmation(key);
 				else await deleteDraft(key);
 			}),
 		},
@@ -104,14 +110,132 @@ function createHarness() {
 
 	return {
 		bureau,
+		deleteConfirmation,
 		deleteDraft,
 		dispatch: buildDispatchTable(email, env, props),
 		drafts,
 		put,
+		staged,
 	};
 }
 
 describe("email capabilities", () => {
+	it("creates a folder only through the confirmation gate", async () => {
+		const { bureau, deleteConfirmation, dispatch, staged } = createHarness();
+
+		const stagedCreate = (await dispatch.email_mailbox_create!({
+			address: "oladayo@example.com",
+			path: " Projects/Ayo ",
+		})) as { confirmId: string; created: boolean; preview: unknown };
+		expect(stagedCreate).toMatchObject({
+			created: false,
+			preview: {
+				address: "oladayo@example.com",
+				path: "Projects/Ayo",
+			},
+		});
+		expect(bureau.createMailbox).not.toHaveBeenCalled();
+
+		await expect(
+			dispatch.email_mailbox_create!({ confirmId: stagedCreate.confirmId }),
+		).resolves.toEqual({
+			created: true,
+			folder: { path: "Projects/Ayo" },
+		});
+		expect(bureau.createMailbox).toHaveBeenCalledWith({
+			address: "oladayo@example.com",
+			path: "Projects/Ayo",
+		});
+		expect(deleteConfirmation).toHaveBeenCalledWith(
+			`confirm:email_mailbox_create:${stagedCreate.confirmId}`,
+		);
+		expect(staged.size).toBe(0);
+	});
+
+	it("renames a folder only through the confirmation gate", async () => {
+		const { bureau, dispatch, staged } = createHarness();
+		const change = {
+			address: "oladayo@example.com",
+			path: "Projects/Bureau",
+			to: "Projects/Ayo",
+		};
+
+		const stagedRename = (await dispatch.email_mailbox_rename!(change)) as {
+			confirmId: string;
+			renamed: boolean;
+			preview: unknown;
+		};
+		expect(stagedRename).toMatchObject({ renamed: false, preview: change });
+		expect(bureau.renameMailbox).not.toHaveBeenCalled();
+
+		await expect(
+			dispatch.email_mailbox_rename!({ confirmId: stagedRename.confirmId }),
+		).resolves.toEqual({
+			renamed: true,
+			folder: { path: "Projects/Ayo" },
+		});
+		expect(bureau.renameMailbox).toHaveBeenCalledWith(change);
+		expect(staged.size).toBe(0);
+	});
+
+	it("refuses to stage deleting an unlisted folder", async () => {
+		const { bureau, dispatch, staged } = createHarness();
+
+		await expect(
+			dispatch.email_mailbox_delete!({
+				address: "oladayo@example.com",
+				path: "Missing",
+			}),
+		).resolves.toEqual({
+			deleted: false,
+			error: "No folder with path Missing is listed for oladayo@example.com.",
+		});
+		expect(bureau.deleteMailbox).not.toHaveBeenCalled();
+		expect(staged.size).toBe(0);
+	});
+
+	it("previews and deletes a listed folder through confirmation", async () => {
+		const { bureau, dispatch, staged } = createHarness();
+		const target = {
+			address: "oladayo@example.com",
+			path: "Archive/2026",
+		};
+
+		const stagedDelete = (await dispatch.email_mailbox_delete!(target)) as {
+			confirmId: string;
+			deleted: boolean;
+			preview: unknown;
+		};
+		expect(stagedDelete).toMatchObject({
+			deleted: false,
+			preview: target,
+		});
+		expect(bureau.deleteMailbox).not.toHaveBeenCalled();
+
+		await expect(
+			dispatch.email_mailbox_delete!({ confirmId: stagedDelete.confirmId }),
+		).resolves.toEqual({ deleted: true, path: "Archive/2026" });
+		expect(bureau.deleteMailbox).toHaveBeenCalledWith(target);
+		expect(staged.size).toBe(0);
+
+		await expect(
+			dispatch.email_mailbox_delete!({ confirmId: stagedDelete.confirmId }),
+		).resolves.toMatchObject({ deleted: false, error: expect.any(String) });
+		expect(bureau.deleteMailbox).toHaveBeenCalledTimes(1);
+	});
+
+	it("rejects invalid mailbox names before staging", async () => {
+		const { dispatch, staged } = createHarness();
+
+		await expect(
+			dispatch.email_mailbox_create!({
+				address: "oladayo@example.com",
+				path: "Projects\nInjected",
+			}),
+		).rejects.toThrow("Mailbox names cannot contain control characters");
+		expect(staged.size).toBe(0);
+	});
+
 	it("lists the tag registry and filters threads by tag", async () => {
 		const { bureau, dispatch } = createHarness();
 

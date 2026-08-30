@@ -67,6 +67,17 @@ const flagInputSchema = accountSchema
 		{ message: "At least one flag must be added or removed" },
 	);
 
+const mailboxNameSchema = z
+	.string()
+	.trim()
+	.min(1)
+	.regex(
+		/^[^\u0000-\u001f\u007f]+$/,
+		"Mailbox names cannot contain control characters",
+	);
+const mailboxPathSchema = accountSchema.extend({ path: mailboxNameSchema });
+const mailboxRenameSchema = mailboxPathSchema.extend({ to: mailboxNameSchema });
+
 const tagWriteSchema = z.object({
 	name: z.string().min(1),
 	color: z.string().min(1).optional(),
@@ -104,6 +115,158 @@ export const email: Capability[] = [
 		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
 			return env.BUREAU.listMailboxes(input as z.infer<typeof accountSchema>);
+		},
+	},
+	{
+		name: "email_mailbox_create",
+		description:
+			"Create a new IMAP mail folder; nest it with the server delimiter shown by email_mailboxes. Confirm-before-act: the first call stages it and returns a preview plus confirmId; once approved, call again with only the confirmId",
+		inputSchema: z.union([
+			mailboxPathSchema,
+			z.object({ confirmId: z.string().min(1) }),
+		]),
+		keywords: [
+			"create a mail folder",
+			"make a new mailbox",
+			"add email folder",
+		],
+		handler: async (rawInput, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			const input = rawInput as
+				| z.infer<typeof mailboxPathSchema>
+				| { confirmId: string };
+			if (!("confirmId" in input)) {
+				const confirmId = await stageConfirmation(
+					env,
+					"email_mailbox_create",
+					input,
+				);
+				return { confirmId, preview: input, created: false };
+			}
+			const staged = await readConfirmation(
+				env,
+				"email_mailbox_create",
+				input.confirmId,
+			);
+			if (!staged) {
+				return {
+					created: false,
+					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the folder again.`,
+				};
+			}
+			const write = mailboxPathSchema.parse(JSON.parse(staged));
+			const created = await env.BUREAU.createMailbox(write);
+			await burnConfirmation(env, "email_mailbox_create", input.confirmId);
+			return { created: true, folder: created };
+		},
+	},
+	{
+		name: "email_mailbox_rename",
+		description:
+			"Rename an IMAP mail folder; its child folders move too, and INBOX cannot be renamed. Confirm-before-act: staging returns a preview plus confirmId; once approved, call again with only the confirmId",
+		inputSchema: z.union([
+			mailboxRenameSchema,
+			z.object({ confirmId: z.string().min(1) }),
+		]),
+		keywords: [
+			"rename this folder",
+			"change mailbox name",
+			"rename mail folder",
+		],
+		handler: async (rawInput, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			const input = rawInput as
+				| z.infer<typeof mailboxRenameSchema>
+				| { confirmId: string };
+			if (!("confirmId" in input)) {
+				const confirmId = await stageConfirmation(
+					env,
+					"email_mailbox_rename",
+					input,
+				);
+				return { confirmId, preview: input, renamed: false };
+			}
+			const staged = await readConfirmation(
+				env,
+				"email_mailbox_rename",
+				input.confirmId,
+			);
+			if (!staged) {
+				return {
+					renamed: false,
+					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the change again.`,
+				};
+			}
+			const write = mailboxRenameSchema.parse(JSON.parse(staged));
+			const renamed = await env.BUREAU.renameMailbox(write);
+			await burnConfirmation(env, "email_mailbox_rename", input.confirmId);
+			return { renamed: true, folder: renamed };
+		},
+	},
+	{
+		name: "email_mailbox_delete",
+		description:
+			"Delete an empty IMAP mailbox; INBOX, special-use, non-empty, and parent mailboxes are refused. Confirm-before-act: staging returns a preview plus confirmId; once approved, call again with only the confirmId",
+		inputSchema: z.union([
+			mailboxPathSchema,
+			z.object({ confirmId: z.string().min(1) }),
+		]),
+		keywords: [
+			"delete an empty folder",
+			"remove empty mailbox",
+			"delete mailbox",
+		],
+		handler: async (rawInput, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			const input = rawInput as
+				| z.infer<typeof mailboxPathSchema>
+				| { confirmId: string };
+			if (!("confirmId" in input)) {
+				const mailboxes = await env.BUREAU.listMailboxes({
+					address: input.address,
+				});
+				const mailbox = mailboxes.find((entry) => entry.path === input.path);
+				if (!mailbox) {
+					return {
+						deleted: false,
+						error: `No folder with path ${input.path} is listed for ${input.address}.`,
+					};
+				}
+				const confirmId = await stageConfirmation(
+					env,
+					"email_mailbox_delete",
+					input,
+				);
+				return {
+					confirmId,
+					preview: {
+						address: input.address,
+						path: mailbox.path,
+						...(mailbox.messages === undefined
+							? {}
+							: { messages: mailbox.messages }),
+						...(mailbox.unseen === undefined
+							? {}
+							: { unseen: mailbox.unseen }),
+					},
+					deleted: false,
+				};
+			}
+			const staged = await readConfirmation(
+				env,
+				"email_mailbox_delete",
+				input.confirmId,
+			);
+			if (!staged) {
+				return {
+					deleted: false,
+					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the deletion again.`,
+				};
+			}
+			const target = mailboxPathSchema.parse(JSON.parse(staged));
+			const removed = await env.BUREAU.deleteMailbox(target);
+			await burnConfirmation(env, "email_mailbox_delete", input.confirmId);
+			return { deleted: true, path: removed.path };
 		},
 	},
 	{
