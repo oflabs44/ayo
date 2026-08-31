@@ -7,7 +7,7 @@ const EVENT_CLAIM_RETENTION_MS = 30 * 24 * 60 * 60_000;
 
 export type JobRunStatus = "success" | "error" | "expired";
 export type JobRunRecordStatus = "running" | JobRunStatus;
-export type JobRunSource = "schedule" | "manual";
+export type JobRunSource = "schedule" | "manual" | "trigger";
 
 export type JobTrigger = {
 	source: string;
@@ -48,6 +48,7 @@ export type JobRunRow = {
 	durationMs: number | null;
 	source: JobRunSource;
 	eventId: string | null;
+	result?: unknown;
 };
 
 export type JobClaim = {
@@ -89,6 +90,7 @@ type StoredJobRunRow = {
 	duration_ms: number | null;
 	source: JobRunSource;
 	event_id: string | null;
+	result_json: string | null;
 };
 
 export function normalizeTimestamp(value: string): string {
@@ -204,6 +206,14 @@ function fromStoredJob(row: StoredJobRow): JobRow {
 }
 
 function fromStoredRun(row: StoredJobRunRow): JobRunRow {
+	let result: unknown;
+	if (row.result_json !== null) {
+		try {
+			result = JSON.parse(row.result_json);
+		} catch {
+			result = row.result_json;
+		}
+	}
 	return {
 		id: row.id,
 		jobId: row.job_id,
@@ -215,6 +225,7 @@ function fromStoredRun(row: StoredJobRunRow): JobRunRow {
 		durationMs: row.duration_ms,
 		source: row.source,
 		eventId: row.event_id,
+		...(row.result_json === null ? {} : { result }),
 	};
 }
 
@@ -521,7 +532,7 @@ export async function claimTriggeredRun(
 				id, job_id, started_at, finished_at, status, error, duration_ms,
 				source, event_id
 			)
-			SELECT ?1, ?2, ?3, NULL, 'running', NULL, NULL, 'schedule', ?4
+			SELECT ?1, ?2, ?3, NULL, 'running', NULL, NULL, 'trigger', ?4
 			WHERE changes() = 1 AND EXISTS (
 				SELECT 1 FROM event_claims
 				WHERE job_id = ?2 AND event_id = ?4 AND claimed_at = ?3
@@ -560,7 +571,7 @@ export async function claimTriggeredRun(
 		}
 		return null;
 	}
-	return { job, runId, startedAt, source: "schedule" };
+	return { job, runId, startedAt, source: "trigger" };
 }
 
 export async function disableJob(
@@ -641,6 +652,7 @@ export async function finalizeJobRun(
 		status: "success" | "error";
 		error: string | null;
 		durationMs: number;
+		resultJson: string | null;
 	},
 ): Promise<JobRow | null> {
 	const startedAt = normalizeTimestamp(run.startedAt);
@@ -680,9 +692,17 @@ export async function finalizeJobRun(
 				finished_at = ?2,
 				status = ?3,
 				error = ?4,
-				duration_ms = ?5
+				duration_ms = ?5,
+				result_json = ?6
 			WHERE id = ?1 AND status = 'running'`,
-		).bind(run.id, finishedAt, run.status, run.error, run.durationMs),
+		).bind(
+			run.id,
+			finishedAt,
+			run.status,
+			run.error,
+			run.durationMs,
+			run.resultJson,
+		),
 	]);
 	if (!changed(finalizeResult)) {
 		throw new Error(`Running record ${run.id} could not be finalized.`);

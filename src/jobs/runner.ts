@@ -32,6 +32,9 @@ type JobExecutionContext = {
 	waitUntil(promise: Promise<unknown>): void;
 };
 
+const MAX_RESULT_JSON_LENGTH = 4096;
+const RESULT_TRUNCATION_MARKER = "…truncated";
+
 async function defaultExecute(
 	input: JobExecutionInput,
 ): Promise<ExecuteOutcome> {
@@ -46,6 +49,23 @@ export type JobRunResult = ExecuteOutcome & {
 
 function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
+}
+
+function serializeResult(result: unknown): string | null {
+	if (result === undefined) return null;
+	try {
+		const serialized = JSON.stringify(result);
+		if (serialized === undefined) return null;
+		if (serialized.length <= MAX_RESULT_JSON_LENGTH) return serialized;
+		return `${serialized.slice(
+			0,
+			MAX_RESULT_JSON_LENGTH - RESULT_TRUNCATION_MARKER.length,
+		)}${RESULT_TRUNCATION_MARKER}`;
+	} catch (error) {
+		// Keep the run's evidence trail honest: an unserializable result must not
+		// look like a job that returned nothing.
+		return JSON.stringify(`[unserializable result: ${errorMessage(error)}]`);
+	}
 }
 
 function nextForRun(job: JobRow, now: number): string | null {
@@ -88,6 +108,7 @@ async function executeAndRecord(
 			status,
 			error: outcome.error ?? null,
 			durationMs,
+			resultJson: serializeResult(outcome.result),
 		})) ?? claim.job;
 
 	return { ...outcome, status, durationMs, job };

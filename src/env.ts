@@ -104,15 +104,6 @@ type BureauTag = {
 	color: string | null;
 	createdAt: string;
 };
-type BureauMailbox = {
-	path: string;
-	name: string;
-	specialUse: string | null;
-	delimiter: string;
-	noselect: boolean;
-	messages?: number;
-	unseen?: number;
-};
 type BureauContact = {
 	id: string;
 	addressbook: string;

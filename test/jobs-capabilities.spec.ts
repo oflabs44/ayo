@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { jobs } from "../src/capabilities/jobs";
 import type { Env, OwnerProps } from "../src/env";
 import { buildDispatchTable } from "../src/execute";
+import { runTriggeredJobs } from "../src/jobs/runner";
 
 const now = Date.parse("2026-08-20T10:00:00Z");
 const props: OwnerProps = {
@@ -78,7 +79,7 @@ describe("job capabilities", () => {
 	it("stages and reads a trigger-only job", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
-		const { dispatch } = createHarness();
+		const { env, dispatch } = createHarness();
 		const trigger = { source: "bureau", kind: "mail.received" };
 
 		const staged = (await dispatch.job_create!({
@@ -102,6 +103,54 @@ describe("job capabilities", () => {
 		await expect(dispatch.job_read!({ id: confirmed.job.id })).resolves.toMatchObject({
 			trigger,
 			nextRunAt: null,
+		});
+
+		const waits: Promise<unknown>[] = [];
+		const context = { waitUntil: (promise: Promise<unknown>) => waits.push(promise) };
+		const execute = vi
+			.fn()
+			.mockResolvedValueOnce({ result: { skipped: true }, logs: [] })
+			.mockResolvedValueOnce({ result: "x".repeat(5_000), logs: [] });
+		await runTriggeredJobs(
+			env,
+			context,
+			"bureau",
+			{ id: "event-result", kind: "mail.received" },
+			execute,
+		);
+		await Promise.all(waits.splice(0));
+		await runTriggeredJobs(
+			env,
+			context,
+			"bureau",
+			{ id: "event-truncated", kind: "mail.received" },
+			execute,
+		);
+		await Promise.all(waits);
+
+		const storedRuns = await env.JOBS_DB.prepare(
+			`SELECT source, result_json FROM job_runs
+			WHERE job_id = ?1 ORDER BY rowid`,
+		)
+			.bind(confirmed.job.id)
+			.all<{ source: string; result_json: string }>();
+		expect(storedRuns.results[0]).toEqual({
+			source: "trigger",
+			result_json: JSON.stringify({ skipped: true }),
+		});
+		expect(storedRuns.results[1]).toEqual({
+			source: "trigger",
+			result_json: expect.stringMatching(/…truncated$/),
+		});
+		expect(storedRuns.results[1]?.result_json).toHaveLength(4096);
+
+		await expect(
+			dispatch.job_read!({ id: confirmed.job.id }),
+		).resolves.toMatchObject({
+			recentRuns: [
+				{ source: "trigger", result: storedRuns.results[1]?.result_json },
+				{ source: "trigger", result: { skipped: true } },
+			],
 		});
 	});
 
