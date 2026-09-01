@@ -99,19 +99,6 @@ Every new capability must ship with:
 - two or three golden queries in the search test suite mapping realistic
   phrasings to the capability
 
-### Confirm-before-act
-
-Outward-facing or hard-to-reverse actions use the two-step in `src/confirm.ts`
-(`calendar_create` is the reference; email's draft-first is the same idea in
-domain vocabulary): the input is a union of the real payload or
-`{ confirmId }` alone; the first call stages the payload in KV (one-hour TTL)
-and returns `{ confirmId, preview, done: false }` without acting; the second
-call validates the staged payload, acts, and burns the token tolerantly. The
-pause between calls is host cooperation, not enforcement - an Access-gated
-approval link in `confirm.ts` is the upgrade path if a guarded action ever
-needs a real human gate. Most capabilities must stay direct: guarding
-private, reversible actions trains hosts to rubber-stamp.
-
 ## Working style
 
 - Smallest coherent diff; no speculative abstractions or scaffolding.

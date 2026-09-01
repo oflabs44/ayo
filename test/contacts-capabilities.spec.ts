@@ -13,7 +13,6 @@ const props: OwnerProps = {
 };
 
 function createHarness() {
-	const staged = new Map<string, string>();
 	const bureau = {
 		listContacts: vi.fn(async () => []),
 		getContact: vi.fn(async () => ({
@@ -30,18 +29,7 @@ function createHarness() {
 		})),
 		removeContact: vi.fn(async () => ({ id: contactId })),
 	} as unknown as BureauBinding;
-	const env = {
-		BUREAU: bureau,
-		OAUTH_KV: {
-			get: vi.fn(async (key: string) => staged.get(key) ?? null),
-			put: vi.fn(async (key: string, value: string) => {
-				staged.set(key, value);
-			}),
-			delete: vi.fn(async (key: string) => {
-				staged.delete(key);
-			}),
-		},
-	} as unknown as Env;
+	const env = { BUREAU: bureau } as unknown as Env;
 
 	return { bureau, env, dispatch: buildDispatchTable(contacts, env, props) };
 }
@@ -76,7 +64,7 @@ describe("contact capabilities", () => {
 		expect(JSON.stringify(card)).not.toContain("PHOTO");
 	});
 
-	it("refuses to stage a likely duplicate by email or name", async () => {
+	it("refuses a likely duplicate by email or name", async () => {
 		const { bureau, dispatch } = createHarness();
 		vi.mocked(bureau.listContacts).mockResolvedValue([
 			{
@@ -100,7 +88,7 @@ describe("contact capabilities", () => {
 		expect(bureau.createContact).not.toHaveBeenCalled();
 	});
 
-	it("refuses to stage a duplicate by name when emails differ", async () => {
+	it("refuses a duplicate by name when emails differ", async () => {
 		const { bureau, dispatch } = createHarness();
 		vi.mocked(bureau.listContacts).mockResolvedValue([
 			{
@@ -119,7 +107,7 @@ describe("contact capabilities", () => {
 		expect(bureau.createContact).not.toHaveBeenCalled();
 	});
 
-	it("stages past the duplicate check with force and creates on confirmation", async () => {
+	it("creates in one call when force overrides a likely duplicate", async () => {
 		const { bureau, dispatch } = createHarness();
 		vi.mocked(bureau.listContacts).mockResolvedValue([
 			{
@@ -129,16 +117,8 @@ describe("contact capabilities", () => {
 			},
 		] as never);
 
-		const stagedResult = (await dispatch.contact_create!({
-			...newContact,
-			force: true,
-		})) as { confirmId: string; created: boolean; preview: unknown };
-		expect(stagedResult.created).toBe(false);
-		expect(stagedResult.preview).toEqual(newContact);
-		expect(bureau.createContact).not.toHaveBeenCalled();
-
 		await expect(
-			dispatch.contact_create!({ confirmId: stagedResult.confirmId }),
+			dispatch.contact_create!({ ...newContact, force: true }),
 		).resolves.toEqual({
 			created: true,
 			contact: {
@@ -150,56 +130,19 @@ describe("contact capabilities", () => {
 		expect(bureau.createContact).toHaveBeenCalledWith(newContact);
 	});
 
-	it("stages a clean create without force and refuses a reused confirmId", async () => {
+	it("reads the current ETag and deletes the contact in one call", async () => {
 		const { bureau, dispatch } = createHarness();
+		const input = { address, id: contactId };
 
-		const stagedResult = (await dispatch.contact_create!(newContact)) as {
-			confirmId: string;
-		};
-		await dispatch.contact_create!({ confirmId: stagedResult.confirmId });
-
-		const reused = (await dispatch.contact_create!({
-			confirmId: stagedResult.confirmId,
-		})) as { created: boolean; error: string };
-		expect(reused.created).toBe(false);
-		expect(reused.error).toContain("unknown or expired");
-		expect(bureau.createContact).toHaveBeenCalledTimes(1);
-	});
-
-	it("previews the card before a confirmed delete", async () => {
-		const { bureau, dispatch } = createHarness();
-
-		const stagedResult = (await dispatch.contact_delete!({
-			address,
+		await expect(dispatch.contact_delete!(input)).resolves.toEqual({
+			deleted: true,
 			id: contactId,
-		})) as { confirmId: string; deleted: boolean; preview: unknown };
-		expect(stagedResult.deleted).toBe(false);
-		expect(stagedResult.preview).toEqual({
-			id: contactId,
-			fn: "Timi Ade",
-			emails: ["timi@example.com"],
 		});
-		expect(bureau.removeContact).not.toHaveBeenCalled();
-
-		await expect(
-			dispatch.contact_delete!({ confirmId: stagedResult.confirmId }),
-		).resolves.toEqual({ deleted: true, id: contactId });
+		expect(bureau.getContact).toHaveBeenCalledWith(input);
 		expect(bureau.removeContact).toHaveBeenCalledWith({
-			address,
-			id: contactId,
+			...input,
 			etag: '"card-v1"',
 		});
-	});
-
-	it("refuses an unknown delete confirmation", async () => {
-		const { bureau, dispatch } = createHarness();
-
-		const result = (await dispatch.contact_delete!({
-			confirmId: "missing",
-		})) as { deleted: boolean; error: string };
-		expect(result.deleted).toBe(false);
-		expect(result.error).toContain("unknown or expired");
-		expect(bureau.removeContact).not.toHaveBeenCalled();
 	});
 
 	it("propagates a Bureau error unchanged", async () => {

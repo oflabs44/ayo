@@ -11,7 +11,6 @@ const props: OwnerProps = {
 
 function createHarness() {
 	const drafts = new Map<string, string>();
-	const staged = new Map<string, string>();
 	const bureau = {
 		createMailbox: vi.fn(async ({ path }: { path: string }) => ({ path })),
 		renameMailbox: vi.fn(async ({ to }: { to: string }) => ({ path: to })),
@@ -86,58 +85,33 @@ function createHarness() {
 	const deleteDraft = vi.fn(async (key: string) => {
 		drafts.delete(key);
 	});
-	const deleteConfirmation = vi.fn(async (key: string) => {
-		staged.delete(key);
-	});
 	const env = {
 		BUREAU: bureau,
 		OAUTH_KV: {
-			get: vi.fn(
-				async (key: string) => drafts.get(key) ?? staged.get(key) ?? null,
-			),
-			put: vi.fn(
-				async (key: string, value: string, options?: { expirationTtl: number }) => {
-					if (key.startsWith("confirm:")) staged.set(key, value);
-					else await put(key, value, options);
-				},
-			),
-			delete: vi.fn(async (key: string) => {
-				if (key.startsWith("confirm:")) await deleteConfirmation(key);
-				else await deleteDraft(key);
-			}),
+			get: vi.fn(async (key: string) => drafts.get(key) ?? null),
+			put,
+			delete: deleteDraft,
 		},
 	} as unknown as Env;
 
 	return {
 		bureau,
-		deleteConfirmation,
 		deleteDraft,
 		dispatch: buildDispatchTable(email, env, props),
 		drafts,
 		put,
-		staged,
 	};
 }
 
 describe("email capabilities", () => {
-	it("creates a folder only through the confirmation gate", async () => {
-		const { bureau, deleteConfirmation, dispatch, staged } = createHarness();
-
-		const stagedCreate = (await dispatch.email_mailbox_create!({
-			address: "oladayo@example.com",
-			path: " Projects/Ayo ",
-		})) as { confirmId: string; created: boolean; preview: unknown };
-		expect(stagedCreate).toMatchObject({
-			created: false,
-			preview: {
-				address: "oladayo@example.com",
-				path: "Projects/Ayo",
-			},
-		});
-		expect(bureau.createMailbox).not.toHaveBeenCalled();
+	it("creates a folder in one call", async () => {
+		const { bureau, dispatch } = createHarness();
 
 		await expect(
-			dispatch.email_mailbox_create!({ confirmId: stagedCreate.confirmId }),
+			dispatch.email_mailbox_create!({
+				address: "oladayo@example.com",
+				path: " Projects/Ayo ",
+			}),
 		).resolves.toEqual({
 			created: true,
 			folder: { path: "Projects/Ayo" },
@@ -146,40 +120,25 @@ describe("email capabilities", () => {
 			address: "oladayo@example.com",
 			path: "Projects/Ayo",
 		});
-		expect(deleteConfirmation).toHaveBeenCalledWith(
-			`confirm:email_mailbox_create:${stagedCreate.confirmId}`,
-		);
-		expect(staged.size).toBe(0);
 	});
 
-	it("renames a folder only through the confirmation gate", async () => {
-		const { bureau, dispatch, staged } = createHarness();
+	it("renames a folder in one call", async () => {
+		const { bureau, dispatch } = createHarness();
 		const change = {
 			address: "oladayo@example.com",
 			path: "Projects/Bureau",
 			to: "Projects/Ayo",
 		};
 
-		const stagedRename = (await dispatch.email_mailbox_rename!(change)) as {
-			confirmId: string;
-			renamed: boolean;
-			preview: unknown;
-		};
-		expect(stagedRename).toMatchObject({ renamed: false, preview: change });
-		expect(bureau.renameMailbox).not.toHaveBeenCalled();
-
-		await expect(
-			dispatch.email_mailbox_rename!({ confirmId: stagedRename.confirmId }),
-		).resolves.toEqual({
+		await expect(dispatch.email_mailbox_rename!(change)).resolves.toEqual({
 			renamed: true,
 			folder: { path: "Projects/Ayo" },
 		});
 		expect(bureau.renameMailbox).toHaveBeenCalledWith(change);
-		expect(staged.size).toBe(0);
 	});
 
-	it("refuses to stage deleting an unlisted folder", async () => {
-		const { bureau, dispatch, staged } = createHarness();
+	it("refuses to delete an unlisted folder", async () => {
+		const { bureau, dispatch } = createHarness();
 
 		await expect(
 			dispatch.email_mailbox_delete!({
@@ -191,41 +150,27 @@ describe("email capabilities", () => {
 			error: "No folder with path Missing is listed for oladayo@example.com.",
 		});
 		expect(bureau.deleteMailbox).not.toHaveBeenCalled();
-		expect(staged.size).toBe(0);
 	});
 
-	it("previews and deletes a listed folder through confirmation", async () => {
-		const { bureau, dispatch, staged } = createHarness();
+	it("checks the folder exists and deletes it in one call", async () => {
+		const { bureau, dispatch } = createHarness();
 		const target = {
 			address: "oladayo@example.com",
 			path: "Archive/2026",
 		};
 
-		const stagedDelete = (await dispatch.email_mailbox_delete!(target)) as {
-			confirmId: string;
-			deleted: boolean;
-			preview: unknown;
-		};
-		expect(stagedDelete).toMatchObject({
-			deleted: false,
-			preview: target,
+		await expect(dispatch.email_mailbox_delete!(target)).resolves.toEqual({
+			deleted: true,
+			path: "Archive/2026",
 		});
-		expect(bureau.deleteMailbox).not.toHaveBeenCalled();
-
-		await expect(
-			dispatch.email_mailbox_delete!({ confirmId: stagedDelete.confirmId }),
-		).resolves.toEqual({ deleted: true, path: "Archive/2026" });
+		expect(bureau.listMailboxes).toHaveBeenCalledWith({
+			address: "oladayo@example.com",
+		});
 		expect(bureau.deleteMailbox).toHaveBeenCalledWith(target);
-		expect(staged.size).toBe(0);
-
-		await expect(
-			dispatch.email_mailbox_delete!({ confirmId: stagedDelete.confirmId }),
-		).resolves.toMatchObject({ deleted: false, error: expect.any(String) });
-		expect(bureau.deleteMailbox).toHaveBeenCalledTimes(1);
 	});
 
-	it("rejects invalid mailbox names before staging", async () => {
-		const { dispatch, staged } = createHarness();
+	it("rejects invalid mailbox names", async () => {
+		const { dispatch } = createHarness();
 
 		await expect(
 			dispatch.email_mailbox_create!({
@@ -233,7 +178,6 @@ describe("email capabilities", () => {
 				path: "Projects\nInjected",
 			}),
 		).rejects.toThrow("Mailbox names cannot contain control characters");
-		expect(staged.size).toBe(0);
 	});
 
 	it("lists the tag registry and filters threads by tag", async () => {
@@ -256,45 +200,23 @@ describe("email capabilities", () => {
 		});
 	});
 
-	it("creates and deletes tags only through the confirmation gate", async () => {
+	it("creates and deletes tags in one call each", async () => {
 		const { bureau, dispatch } = createHarness();
-
-		const stagedCreate = (await dispatch.email_tag_create!({
-			name: "Receipts",
-		})) as { confirmId: string; created: boolean };
-		expect(stagedCreate.created).toBe(false);
-		expect(bureau.createTag).not.toHaveBeenCalled();
+		const id = "55555555-5555-4555-8555-555555555555";
 
 		await expect(
-			dispatch.email_tag_create!({ confirmId: stagedCreate.confirmId }),
+			dispatch.email_tag_create!({ name: "Receipts" }),
 		).resolves.toMatchObject({ created: true });
 		expect(bureau.createTag).toHaveBeenCalledWith({ name: "Receipts" });
 
-		const stagedDelete = (await dispatch.email_tag_delete!({
-			id: "55555555-5555-4555-8555-555555555555",
-		})) as { confirmId: string; preview: unknown };
-		expect(stagedDelete.preview).toEqual({
-			id: "55555555-5555-4555-8555-555555555555",
-			name: "Receipts",
-			keyword: "AyoReceipts",
-		});
-		expect(bureau.deleteTag).not.toHaveBeenCalled();
-
-		await expect(
-			dispatch.email_tag_delete!({ confirmId: stagedDelete.confirmId }),
-		).resolves.toEqual({
+		await expect(dispatch.email_tag_delete!({ id })).resolves.toEqual({
 			deleted: true,
-			id: "55555555-5555-4555-8555-555555555555",
+			id,
 		});
-
-		const reused = (await dispatch.email_tag_delete!({
-			confirmId: stagedDelete.confirmId,
-		})) as { deleted: boolean; error: string };
-		expect(reused.deleted).toBe(false);
-		expect(reused.error).toContain("unknown or expired");
+		expect(bureau.deleteTag).toHaveBeenCalledWith({ id });
 	});
 
-	it("updates a tag only through the confirmation gate", async () => {
+	it("updates a tag in one call", async () => {
 		const { bureau, dispatch } = createHarness();
 		vi.mocked(bureau.updateTag).mockResolvedValueOnce({
 			id: "55555555-5555-4555-8555-555555555555",
@@ -303,41 +225,16 @@ describe("email capabilities", () => {
 			color: "#112233",
 			createdAt: "2026-08-27T00:00:00Z",
 		});
-
-		const stagedUpdate = (await dispatch.email_tag_update!({
+		const input = {
 			id: "55555555-5555-4555-8555-555555555555",
 			name: "Invoices",
 			color: "#112233",
-		})) as { confirmId: string; updated: boolean; preview: unknown };
-		expect(stagedUpdate.updated).toBe(false);
-		expect(bureau.updateTag).not.toHaveBeenCalled();
+		};
 
-		await expect(
-			dispatch.email_tag_update!({ confirmId: stagedUpdate.confirmId }),
-		).resolves.toMatchObject({ updated: true });
-		expect(bureau.updateTag).toHaveBeenCalledWith({
-			id: "55555555-5555-4555-8555-555555555555",
-			name: "Invoices",
-			color: "#112233",
+		await expect(dispatch.email_tag_update!(input)).resolves.toMatchObject({
+			updated: true,
 		});
-
-		const reused = (await dispatch.email_tag_update!({
-			confirmId: stagedUpdate.confirmId,
-		})) as { updated: boolean; error: string };
-		expect(reused.updated).toBe(false);
-		expect(reused.error).toContain("unknown or expired");
-		expect(bureau.updateTag).toHaveBeenCalledTimes(1);
-	});
-
-	it("refuses to stage deleting an unknown tag", async () => {
-		const { bureau, dispatch } = createHarness();
-
-		const result = (await dispatch.email_tag_delete!({
-			id: "99999999-9999-4999-8999-999999999999",
-		})) as { deleted: boolean; error: string };
-		expect(result.deleted).toBe(false);
-		expect(result.error).toContain("No tag");
-		expect(bureau.deleteTag).not.toHaveBeenCalled();
+		expect(bureau.updateTag).toHaveBeenCalledWith(input);
 	});
 
 	it("stores the user-facing preview and maps its body only when sending", async () => {

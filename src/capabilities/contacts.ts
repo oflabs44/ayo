@@ -1,9 +1,4 @@
 import { z } from "zod";
-import {
-	burnConfirmation,
-	readConfirmation,
-	stageConfirmation,
-} from "../confirm";
 import type { Env } from "../env";
 import type { Capability } from "./index";
 
@@ -53,14 +48,10 @@ const contactWriteSchema = accountSchema.extend({
 	note: z.string().optional(),
 	categories: z.array(z.string()).optional(),
 });
-const createContactSchema = z.union([
-	contactWriteSchema.extend({ force: z.boolean().optional() }),
-	z.object({ confirmId: z.string().min(1) }),
-]);
-const deleteContactSchema = z.union([
-	resourceSchema,
-	z.object({ confirmId: z.string().min(1) }),
-]);
+const createContactSchema = contactWriteSchema.extend({
+	force: z.boolean().optional(),
+});
+const deleteContactSchema = resourceSchema;
 
 type ContactWrite = z.infer<typeof contactWriteSchema>;
 
@@ -152,7 +143,7 @@ export const contacts: Capability[] = [
 	{
 		name: "contact_create",
 		description:
-			"Save a new person to the address book. Verify-first and confirm-before-act: the first call refuses likely duplicates (force: true overrides), otherwise it stages the card and returns a preview plus confirmId; once approved, call again with only the confirmId",
+			"Save a new person to the address book. Likely duplicates are refused unless force: true marks this as a genuinely different person",
 		inputSchema: createContactSchema,
 		keywords: [
 			"add a contact",
@@ -162,50 +153,27 @@ export const contacts: Capability[] = [
 		],
 		handler: async (rawInput, { env }) => {
 			if (!env.BUREAU) return unavailable();
-			const input = rawInput as z.infer<typeof createContactSchema>;
-
-			if (!("confirmId" in input)) {
-				const { force, ...write } = input;
-				if (!force) {
-					const duplicates = await findLikelyDuplicates(env, write);
-					if (duplicates.length > 0) {
-						return {
-							created: false,
-							matches: duplicates,
-							error:
-								"A likely matching contact exists. Contacts are managed in Bureau - update the existing card there, or pass force: true for a genuinely different person.",
-						};
-					}
+			const { force, ...write } = rawInput as z.infer<
+				typeof createContactSchema
+			>;
+			if (!force) {
+				const duplicates = await findLikelyDuplicates(env, write);
+				if (duplicates.length > 0) {
+					return {
+						created: false,
+						matches: duplicates,
+						error:
+							"A likely matching contact exists. Contacts are managed in Bureau - update the existing card there, or pass force: true for a genuinely different person.",
+					};
 				}
-				const confirmId = await stageConfirmation(
-					env,
-					"contact_create",
-					write,
-				);
-				return { confirmId, preview: write, created: false };
 			}
-
-			const staged = await readConfirmation(
-				env,
-				"contact_create",
-				input.confirmId,
-			);
-			if (!staged) {
-				return {
-					created: false,
-					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the contact again.`,
-				};
-			}
-			const write = contactWriteSchema.parse(JSON.parse(staged));
 			const created = await env.BUREAU.createContact(write);
-			await burnConfirmation(env, "contact_create", input.confirmId);
 			return { created: true, contact: compactCard(created) };
 		},
 	},
 	{
 		name: "contact_delete",
-		description:
-			"Remove a person from the address book. Confirm-before-act: the first call returns the card as a preview plus confirmId; once approved, call again with only the confirmId",
+		description: "Remove a person from the address book",
 		inputSchema: deleteContactSchema,
 		keywords: [
 			"delete a contact",
@@ -215,35 +183,11 @@ export const contacts: Capability[] = [
 		handler: async (rawInput, { env }) => {
 			if (!env.BUREAU) return unavailable();
 			const input = rawInput as z.infer<typeof deleteContactSchema>;
-
-			if (!("confirmId" in input)) {
-				const card = await env.BUREAU.getContact(input);
-				// The etag pins the deletion to the previewed revision: an edit
-				// between staging and confirmation makes the delete refuse.
-				const confirmId = await stageConfirmation(env, "contact_delete", {
-					address: input.address,
-					id: input.id,
-					etag: card.etag,
-				});
-				return { confirmId, preview: compactCard(card), deleted: false };
-			}
-
-			const staged = await readConfirmation(
-				env,
-				"contact_delete",
-				input.confirmId,
-			);
-			if (!staged) {
-				return {
-					deleted: false,
-					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the deletion again.`,
-				};
-			}
-			const target = resourceSchema
-				.extend({ etag: z.string().min(1) })
-				.parse(JSON.parse(staged));
-			const removed = await env.BUREAU.removeContact(target);
-			await burnConfirmation(env, "contact_delete", input.confirmId);
+			const card = await env.BUREAU.getContact(input);
+			const removed = await env.BUREAU.removeContact({
+				...input,
+				etag: card.etag,
+			});
 			return { deleted: true, id: removed.id };
 		},
 	},

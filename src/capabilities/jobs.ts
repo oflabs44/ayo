@@ -1,10 +1,5 @@
 import { z } from "zod";
-import {
-	burnConfirmation,
-	readConfirmation,
-	stageConfirmation,
-} from "../confirm";
-import type { Env, OwnerProps } from "../env";
+import type { OwnerProps } from "../env";
 import { runJobNow } from "../jobs/runner";
 import {
 	describeSchedule,
@@ -27,7 +22,6 @@ import {
 import type { Capability } from "./index";
 
 const DEFAULT_EXPIRY_MS = 30 * 24 * 60 * 60_000;
-const confirmSchema = z.object({ confirmId: z.string().min(1) });
 const jobIdSchema = z.object({ id: z.uuid() });
 const codeSchema = z
 	.string()
@@ -80,7 +74,7 @@ const createPayloadSchema = z
 	.refine(({ schedule, trigger }) => schedule !== undefined || trigger !== undefined, {
 		message: "A job requires a schedule, a trigger, or both.",
 	});
-const createJobSchema = z.union([createPayloadSchema, confirmSchema]);
+const createJobSchema = createPayloadSchema;
 const jobChangeShape = {
 	name: z.string().trim().min(1).max(80).optional(),
 	code: codeSchema.optional(),
@@ -99,37 +93,7 @@ const updatePayloadSchema = z
 		({ id: _id, ...changes }) => hasJobChange(changes),
 		{ message: "At least one field to update is required." },
 	);
-const updateJobSchema = z.union([updatePayloadSchema, confirmSchema]);
-const ownerPropsSchema = z.object({
-	email: z.string(),
-	name: z.string(),
-	sub: z.string(),
-});
-const jobRowSchema = z.object({
-	id: z.uuid(),
-	name: z.string(),
-	code: z.string(),
-	schedule: scheduleSchema.optional(),
-	trigger: triggerSchema.optional(),
-	timezone: z.string().optional(),
-	enabled: z.boolean(),
-	ownerProps: ownerPropsSchema,
-	expiresAt: z.string().nullable(),
-	nextRunAt: z.string().nullable(),
-	createdAt: z.string(),
-	updatedAt: z.string(),
-	lastRunAt: z.string().nullable(),
-	lastRunStatus: z.enum(["success", "error", "expired"]).nullable(),
-	lastRunError: z.string().nullable(),
-	lastDurationMs: z.number().nullable(),
-	runCount: z.number().int(),
-	successCount: z.number().int(),
-	errorCount: z.number().int(),
-});
-const stagedUpdateSchema = z.object({
-	job: jobRowSchema,
-	expectedUpdatedAt: z.string(),
-});
+const updateJobSchema = updatePayloadSchema;
 
 type CreatePayload = z.infer<typeof createPayloadSchema>;
 type UpdatePayload = z.infer<typeof updatePayloadSchema>;
@@ -233,23 +197,14 @@ function mergeJob(job: JobRow, changes: JobChanges, now: number): JobRow {
 	};
 }
 
-function createPreview(payload: CreatePayload, now: number) {
-	const schedule =
-		payload.schedule === undefined
-			? undefined
-			: normalizeSchedule(payload.schedule);
-	const expiresAt =
-		payload.expiresAt === undefined
-			? new Date(now + DEFAULT_EXPIRY_MS).toISOString()
-			: payload.expiresAt === null
-				? null
-				: normalizeTimestamp(payload.expiresAt);
-	// Compute once during staging so malformed or exhausted schedules never get
-	// as far as a confirmation token.
-	if (schedule !== undefined) nextFor(schedule, payload.timezone, now);
-	return schedule === undefined
-		? { ...payload, expiresAt }
-		: { ...payload, schedule, expiresAt };
+function withDefaultExpiry(payload: CreatePayload, now: number) {
+	return {
+		...payload,
+		expiresAt:
+			payload.expiresAt === undefined
+				? new Date(now + DEFAULT_EXPIRY_MS).toISOString()
+				: payload.expiresAt,
+	};
 }
 
 function compactJob(job: JobRow) {
@@ -268,64 +223,11 @@ function compactJob(job: JobRow) {
 	};
 }
 
-async function confirmedCreate(
-	env: Env,
-	props: OwnerProps,
-	confirmId: string,
-) {
-	const staged = await readConfirmation(env, "job_create", confirmId);
-	if (!staged) {
-		return {
-			created: false,
-			error: `Confirmation ${confirmId} is unknown or expired. Stage the job again.`,
-		};
-	}
-	const payload = createPayloadSchema
-		.required({ expiresAt: true })
-		.parse(JSON.parse(staged));
-	const job = newJob(payload, props, Date.now());
-	await createJob(env, job);
-	await burnConfirmation(env, "job_create", confirmId);
-	return { created: true, job };
-}
-
-async function confirmedUpdate(env: Env, confirmId: string) {
-	const staged = await readConfirmation(env, "job_update", confirmId);
-	if (!staged) {
-		return {
-			updated: false,
-			error: `Confirmation ${confirmId} is unknown or expired. Stage the update again.`,
-		};
-	}
-	const { job, expectedUpdatedAt } = stagedUpdateSchema.parse(
-		JSON.parse(staged),
-	);
-	const current = await getJob(env, job.id);
-	if (!current || current.updatedAt !== expectedUpdatedAt) {
-		await burnConfirmation(env, "job_update", confirmId);
-		return {
-			updated: false,
-			error:
-				"The job changed or was deleted after this update was staged. Read it and stage the update again.",
-		};
-	}
-	if (!(await updateJob(env, job, expectedUpdatedAt))) {
-		await burnConfirmation(env, "job_update", confirmId);
-		return {
-			updated: false,
-			error:
-				"The job changed or was deleted while this update was confirmed. Read it and stage the update again.",
-		};
-	}
-	await burnConfirmation(env, "job_update", confirmId);
-	return { updated: true, job };
-}
-
 export const jobs: Capability[] = [
 	{
 		name: "job_create",
 		description:
-			"Create unattended automation on a schedule or in reaction to an event—for example: when an email arrives, tag it. The automation can call ayo.* capabilities. Confirm-before-act: the first call returns the automation, schedule or trigger, and real expiry as a preview plus confirmId; after approval, call again with only confirmId",
+			"Create unattended automation on a schedule or in reaction to an event—for example: when an email arrives, tag it. The automation can call ayo.* capabilities",
 		inputSchema: createJobSchema,
 		keywords: [
 			"run every morning at 8",
@@ -338,13 +240,14 @@ export const jobs: Capability[] = [
 			"event triggered job",
 		],
 		handler: async (rawInput, { env, props }) => {
-			const input = rawInput as z.infer<typeof createJobSchema>;
-			if ("confirmId" in input) {
-				return confirmedCreate(env, props, input.confirmId);
-			}
-			const preview = createPreview(input, Date.now());
-			const confirmId = await stageConfirmation(env, "job_create", preview);
-			return { confirmId, preview, created: false };
+			const now = Date.now();
+			const payload = withDefaultExpiry(
+				rawInput as z.infer<typeof createJobSchema>,
+				now,
+			);
+			const job = newJob(payload, props, now);
+			await createJob(env, job);
+			return { created: true, job };
 		},
 	},
 	{
@@ -382,7 +285,7 @@ export const jobs: Capability[] = [
 	{
 		name: "job_update",
 		description:
-			"Change the schedule or trigger for this automation, or pause, resume, and edit it. Confirm-before-act: the first call previews the merged job plus confirmId; after approval, call again with only confirmId",
+			"Change the schedule or trigger for this automation, or pause, resume, and edit it",
 		inputSchema: updateJobSchema,
 		keywords: [
 			"pause that job",
@@ -392,19 +295,18 @@ export const jobs: Capability[] = [
 			"edit job script",
 		],
 		handler: async (rawInput, { env }) => {
-			const input = rawInput as z.infer<typeof updateJobSchema>;
-			if ("confirmId" in input) {
-				return confirmedUpdate(env, input.confirmId);
-			}
-			const { id, ...changes } = input;
+			const { id, ...changes } = rawInput as z.infer<typeof updateJobSchema>;
 			const current = await getJob(env, id);
 			if (!current) throw noJob(id);
-			const preview = mergeJob(current, changes, Date.now());
-			const confirmId = await stageConfirmation(env, "job_update", {
-				job: preview,
-				expectedUpdatedAt: current.updatedAt,
-			});
-			return { confirmId, preview, updated: false };
+			const job = mergeJob(current, changes, Date.now());
+			if (!(await updateJob(env, job, current.updatedAt))) {
+				return {
+					updated: false,
+					error:
+						"The job changed or was deleted while this update was applied. Read it and try again.",
+				};
+			}
+			return { updated: true, job };
 		},
 	},
 	{

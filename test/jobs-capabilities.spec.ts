@@ -26,13 +26,10 @@ function createHarness() {
 	return { env, dispatch: buildDispatchTable(jobs, env, props) };
 }
 
-async function createConfirmed(
+async function createStoredJob(
 	dispatch: ReturnType<typeof buildDispatchTable>,
 ) {
-	const staged = (await dispatch.job_create!(createInput)) as {
-		confirmId: string;
-	};
-	return dispatch.job_create!({ confirmId: staged.confirmId }) as Promise<{
+	return dispatch.job_create!(createInput) as Promise<{
 		created: boolean;
 		job: { id: string };
 	}>;
@@ -44,27 +41,12 @@ afterEach(() => {
 });
 
 describe("job capabilities", () => {
-	it("stages the real default expiry and creates only after confirmation", async () => {
+	it("creates with the real default expiry in one call", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
 		const { dispatch } = createHarness();
 
-		const staged = (await dispatch.job_create!(createInput)) as {
-			confirmId: string;
-			created: boolean;
-			preview: Record<string, unknown>;
-		};
-		expect(staged.created).toBe(false);
-		expect(staged.preview).toMatchObject({
-			...createInput,
-			expiresAt: "2026-09-19T10:00:00.000Z",
-		});
-		expect(staged.preview).not.toHaveProperty("id");
-
-		const confirmed = (await dispatch.job_create!({
-			confirmId: staged.confirmId,
-		})) as { created: boolean; job: Record<string, unknown> };
-		expect(confirmed).toMatchObject({
+		await expect(dispatch.job_create!(createInput)).resolves.toMatchObject({
 			created: true,
 			job: {
 				name: "Daily brief",
@@ -76,31 +58,22 @@ describe("job capabilities", () => {
 		});
 	});
 
-	it("stages and reads a trigger-only job", async () => {
+	it("creates and reads a trigger-only job", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
 		const { env, dispatch } = createHarness();
 		const trigger = { source: "bureau", kind: "mail.received" };
 
-		const staged = (await dispatch.job_create!({
+		const created = (await dispatch.job_create!({
 			name: "Tag new mail",
 			code: createInput.code,
 			trigger,
-		})) as {
-			confirmId: string;
-			preview: Record<string, unknown>;
-		};
-		expect(staged.preview).toMatchObject({ trigger });
-		expect(staged.preview).not.toHaveProperty("schedule");
-
-		const confirmed = (await dispatch.job_create!({
-			confirmId: staged.confirmId,
 		})) as { job: { id: string; nextRunAt: string | null } };
-		expect(confirmed.job.nextRunAt).toBeNull();
+		expect(created.job.nextRunAt).toBeNull();
 		await expect(dispatch.job_list!({})).resolves.toMatchObject({
-			jobs: [{ id: confirmed.job.id, trigger, scheduleSummary: null }],
+			jobs: [{ id: created.job.id, trigger, scheduleSummary: null }],
 		});
-		await expect(dispatch.job_read!({ id: confirmed.job.id })).resolves.toMatchObject({
+		await expect(dispatch.job_read!({ id: created.job.id })).resolves.toMatchObject({
 			trigger,
 			nextRunAt: null,
 		});
@@ -132,7 +105,7 @@ describe("job capabilities", () => {
 			`SELECT source, result_json FROM job_runs
 			WHERE job_id = ?1 ORDER BY rowid`,
 		)
-			.bind(confirmed.job.id)
+			.bind(created.job.id)
 			.all<{ source: string; result_json: string }>();
 		expect(storedRuns.results[0]).toEqual({
 			source: "trigger",
@@ -145,7 +118,7 @@ describe("job capabilities", () => {
 		expect(storedRuns.results[1]?.result_json).toHaveLength(4096);
 
 		await expect(
-			dispatch.job_read!({ id: confirmed.job.id }),
+			dispatch.job_read!({ id: created.job.id }),
 		).resolves.toMatchObject({
 			recentRuns: [
 				{ source: "trigger", result: storedRuns.results[1]?.result_json },
@@ -154,7 +127,7 @@ describe("job capabilities", () => {
 		});
 	});
 
-	it("carries trigger.accounts through staging, preview, and persisted read", async () => {
+	it("carries trigger.accounts through creation and persisted read", async () => {
 		const { dispatch } = createHarness();
 		const trigger = {
 			source: "bureau",
@@ -162,18 +135,13 @@ describe("job capabilities", () => {
 			accounts: ["ola@4wardthinkers.com"],
 		};
 
-		const staged = (await dispatch.job_create!({
+		const created = (await dispatch.job_create!({
 			name: "scoped",
 			code: "export default async function main() {}",
 			trigger,
-		})) as { confirmId: string; preview: { trigger: unknown } };
-		expect(staged.preview.trigger).toEqual(trigger);
-
-		const confirmed = (await dispatch.job_create!({
-			confirmId: staged.confirmId,
 		})) as { job: { id: string } };
 		await expect(
-			dispatch.job_read!({ id: confirmed.job.id }),
+			dispatch.job_read!({ id: created.job.id }),
 		).resolves.toMatchObject({ trigger });
 	});
 
@@ -183,44 +151,24 @@ describe("job capabilities", () => {
 			source: "bureau",
 			accounts: ["ola@4wardthinkers.com"],
 		};
-		const staged = (await dispatch.job_create!({
+		const created = (await dispatch.job_create!({
 			name: "scoped-update",
 			code: "export default async function main() {}",
 			trigger,
-		})) as { confirmId: string };
-		const created = (await dispatch.job_create!({
-			confirmId: staged.confirmId,
 		})) as { job: { id: string } };
 		const id = created.job.id;
 
-		const rename = (await dispatch.job_update!({
-			id,
-			name: "renamed",
-		})) as { confirmId: string; preview: { trigger: unknown } };
-		expect(rename.preview.trigger).toEqual(trigger);
-		await dispatch.job_update!({ confirmId: rename.confirmId });
-		await expect(dispatch.job_read!({ id })).resolves.toMatchObject({
-			trigger,
-		});
+		await dispatch.job_update!({ id, name: "renamed" });
+		await expect(dispatch.job_read!({ id })).resolves.toMatchObject({ trigger });
 
 		const widened = { source: "bureau", accounts: ["a@example.com", "b@example.com"] };
-		const replace = (await dispatch.job_update!({
-			id,
-			trigger: widened,
-		})) as { confirmId: string; preview: { trigger: unknown } };
-		expect(replace.preview.trigger).toEqual(widened);
-		await dispatch.job_update!({ confirmId: replace.confirmId });
+		await dispatch.job_update!({ id, trigger: widened });
 		await expect(dispatch.job_read!({ id })).resolves.toMatchObject({
 			trigger: widened,
 		});
 
 		const cleared = { source: "bureau" };
-		const clear = (await dispatch.job_update!({
-			id,
-			trigger: cleared,
-		})) as { confirmId: string; preview: { trigger: unknown } };
-		expect(clear.preview.trigger).toEqual(cleared);
-		await dispatch.job_update!({ confirmId: clear.confirmId });
+		await dispatch.job_update!({ id, trigger: cleared });
 		const final = (await dispatch.job_read!({ id })) as {
 			trigger: Record<string, unknown>;
 		};
@@ -237,31 +185,20 @@ describe("job capabilities", () => {
 		).rejects.toThrow("schedule, a trigger, or both");
 	});
 
-	it("normalizes offset timestamps before staging and storage", async () => {
+	it("normalizes offset timestamps before storage", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
 		const { dispatch } = createHarness();
-		const staged = (await dispatch.job_create!({
-			...createInput,
-			schedule: {
-				type: "once",
-				runAt: "2026-08-20T09:30:00-04:00",
-			},
-			expiresAt: "2026-08-20T10:00:00-04:00",
-		})) as {
-			confirmId: string;
-			preview: {
-				schedule: { type: "once"; runAt: string };
-				expiresAt: string;
-			};
-		};
 
-		expect(staged.preview).toMatchObject({
-			schedule: { type: "once", runAt: "2026-08-20T13:30:00.000Z" },
-			expiresAt: "2026-08-20T14:00:00.000Z",
-		});
 		await expect(
-			dispatch.job_create!({ confirmId: staged.confirmId }),
+			dispatch.job_create!({
+				...createInput,
+				schedule: {
+					type: "once",
+					runAt: "2026-08-20T09:30:00-04:00",
+				},
+				expiresAt: "2026-08-20T10:00:00-04:00",
+			}),
 		).resolves.toMatchObject({
 			job: {
 				schedule: { runAt: "2026-08-20T13:30:00.000Z" },
@@ -271,108 +208,52 @@ describe("job capabilities", () => {
 		});
 	});
 
-	it("allows a null expiry and refuses a reused create confirmation", async () => {
+	it("allows a null expiry", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
 		const { dispatch } = createHarness();
-		const staged = (await dispatch.job_create!({
-			...createInput,
-			expiresAt: null,
-		})) as { confirmId: string; preview: { expiresAt: string | null } };
-		expect(staged.preview.expiresAt).toBeNull();
-		await dispatch.job_create!({ confirmId: staged.confirmId });
-
-		const reused = (await dispatch.job_create!({
-			confirmId: staged.confirmId,
-		})) as { created: boolean; error: string };
-		expect(reused.created).toBe(false);
-		expect(reused.error).toContain("unknown or expired");
-	});
-
-	it("previews a merged update and applies it after confirmation", async () => {
-		vi.useFakeTimers();
-		vi.setSystemTime(now);
-		const { dispatch } = createHarness();
-		const created = await createConfirmed(dispatch);
-
-		const trigger = { source: "bureau", kind: "mail.received" };
-		const staged = (await dispatch.job_update!({
-			id: created.job.id,
-			enabled: false,
-			name: "Paused brief",
-			trigger,
-		})) as {
-			confirmId: string;
-			updated: boolean;
-			preview: Record<string, unknown>;
-		};
-		expect(staged.updated).toBe(false);
-		expect(staged.preview).toMatchObject({
-			id: created.job.id,
-			name: "Paused brief",
-			enabled: false,
-			code: createInput.code,
-			schedule: createInput.schedule,
-			trigger,
-		});
 
 		await expect(
-			dispatch.job_update!({ confirmId: staged.confirmId }),
+			dispatch.job_create!({ ...createInput, expiresAt: null }),
+		).resolves.toMatchObject({ job: { expiresAt: null } });
+	});
+
+	it("merges and applies an update in one call", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(now);
+		const { dispatch } = createHarness();
+		const created = await createStoredJob(dispatch);
+		const trigger = { source: "bureau", kind: "mail.received" };
+
+		await expect(
+			dispatch.job_update!({
+				id: created.job.id,
+				enabled: false,
+				name: "Paused brief",
+				trigger,
+			}),
 		).resolves.toMatchObject({
 			updated: true,
 			job: {
 				id: created.job.id,
 				name: "Paused brief",
 				enabled: false,
+				code: createInput.code,
+				schedule: createInput.schedule,
 				trigger,
 			},
 		});
-		const reused = (await dispatch.job_update!({
-			confirmId: staged.confirmId,
-		})) as { updated: boolean; error: string };
-		expect(reused.updated).toBe(false);
-		expect(reused.error).toContain("unknown or expired");
 	});
 
-	it("refuses an update confirmation after a concurrent change", async () => {
+	it("recomputes nextRunAt when a schedule changes", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
 		const { dispatch } = createHarness();
-		const created = await createConfirmed(dispatch);
-		const stale = (await dispatch.job_update!({
-			id: created.job.id,
-			name: "Stale preview",
-		})) as { confirmId: string };
-		const concurrent = (await dispatch.job_update!({
-			id: created.job.id,
-			enabled: false,
-		})) as { confirmId: string };
-		await dispatch.job_update!({ confirmId: concurrent.confirmId });
-
-		await expect(
-			dispatch.job_update!({ confirmId: stale.confirmId }),
-		).resolves.toMatchObject({
-			updated: false,
-			error: expect.stringContaining("changed or was deleted"),
-		});
-		await expect(dispatch.job_read!({ id: created.job.id })).resolves.toMatchObject(
-			{ name: "Daily brief", enabled: false },
-		);
-	});
-
-	it("recomputes nextRunAt when a confirmed schedule changes", async () => {
-		vi.useFakeTimers();
-		vi.setSystemTime(now);
-		const { dispatch } = createHarness();
-		const created = await createConfirmed(dispatch);
-		const staged = (await dispatch.job_update!({
-			id: created.job.id,
-			schedule: { type: "interval", everyMs: 3_600_000 },
-		})) as { confirmId: string; preview: { nextRunAt: string } };
-		expect(staged.preview.nextRunAt).toBe("2026-08-20T11:00:00.000Z");
+		const created = await createStoredJob(dispatch);
 
 		const result = (await dispatch.job_update!({
-			confirmId: staged.confirmId,
+			id: created.job.id,
+			schedule: { type: "interval", everyMs: 3_600_000 },
 		})) as { job: { nextRunAt: string } };
 		expect(result.job.nextRunAt).toBe("2026-08-20T11:00:00.000Z");
 	});
@@ -381,7 +262,7 @@ describe("job capabilities", () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
 		const { dispatch } = createHarness();
-		const created = await createConfirmed(dispatch);
+		const created = await createStoredJob(dispatch);
 
 		await expect(dispatch.job_list!({})).resolves.toEqual({
 			jobs: [
@@ -411,7 +292,7 @@ describe("job capabilities", () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
 		const { dispatch } = createHarness();
-		const created = await createConfirmed(dispatch);
+		const created = await createStoredJob(dispatch);
 
 		await expect(dispatch.job_run_now!({ id: created.job.id })).resolves.toMatchObject(
 			{

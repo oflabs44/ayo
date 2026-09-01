@@ -1,9 +1,4 @@
 import { z } from "zod";
-import {
-	burnConfirmation,
-	readConfirmation,
-	stageConfirmation,
-} from "../confirm";
 import type { Capability } from "./index";
 
 const DRAFT_TTL_SECONDS = 86_400;
@@ -120,97 +115,44 @@ export const email: Capability[] = [
 	{
 		name: "email_mailbox_create",
 		description:
-			"Create a new IMAP mail folder; nest it with the server delimiter shown by email_mailboxes. Confirm-before-act: the first call stages it and returns a preview plus confirmId; once approved, call again with only the confirmId",
-		inputSchema: z.union([
-			mailboxPathSchema,
-			z.object({ confirmId: z.string().min(1) }),
-		]),
+			"Create a new IMAP mail folder; nest it with the server delimiter shown by email_mailboxes",
+		inputSchema: mailboxPathSchema,
 		keywords: [
 			"create a mail folder",
 			"make a new mailbox",
 			"add email folder",
 		],
-		handler: async (rawInput, { env }) => {
+		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
-			const input = rawInput as
-				| z.infer<typeof mailboxPathSchema>
-				| { confirmId: string };
-			if (!("confirmId" in input)) {
-				const confirmId = await stageConfirmation(
-					env,
-					"email_mailbox_create",
-					input,
-				);
-				return { confirmId, preview: input, created: false };
-			}
-			const staged = await readConfirmation(
-				env,
-				"email_mailbox_create",
-				input.confirmId,
+			const created = await env.BUREAU.createMailbox(
+				input as z.infer<typeof mailboxPathSchema>,
 			);
-			if (!staged) {
-				return {
-					created: false,
-					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the folder again.`,
-				};
-			}
-			const write = mailboxPathSchema.parse(JSON.parse(staged));
-			const created = await env.BUREAU.createMailbox(write);
-			await burnConfirmation(env, "email_mailbox_create", input.confirmId);
 			return { created: true, folder: created };
 		},
 	},
 	{
 		name: "email_mailbox_rename",
 		description:
-			"Rename an IMAP mail folder; its child folders move too, and INBOX cannot be renamed. Confirm-before-act: staging returns a preview plus confirmId; once approved, call again with only the confirmId",
-		inputSchema: z.union([
-			mailboxRenameSchema,
-			z.object({ confirmId: z.string().min(1) }),
-		]),
+			"Rename an IMAP mail folder; its child folders move too, and INBOX cannot be renamed",
+		inputSchema: mailboxRenameSchema,
 		keywords: [
 			"rename this folder",
 			"change mailbox name",
 			"rename mail folder",
 		],
-		handler: async (rawInput, { env }) => {
+		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
-			const input = rawInput as
-				| z.infer<typeof mailboxRenameSchema>
-				| { confirmId: string };
-			if (!("confirmId" in input)) {
-				const confirmId = await stageConfirmation(
-					env,
-					"email_mailbox_rename",
-					input,
-				);
-				return { confirmId, preview: input, renamed: false };
-			}
-			const staged = await readConfirmation(
-				env,
-				"email_mailbox_rename",
-				input.confirmId,
+			const renamed = await env.BUREAU.renameMailbox(
+				input as z.infer<typeof mailboxRenameSchema>,
 			);
-			if (!staged) {
-				return {
-					renamed: false,
-					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the change again.`,
-				};
-			}
-			const write = mailboxRenameSchema.parse(JSON.parse(staged));
-			const renamed = await env.BUREAU.renameMailbox(write);
-			await burnConfirmation(env, "email_mailbox_rename", input.confirmId);
 			return { renamed: true, folder: renamed };
 		},
 	},
 	{
 		name: "email_mailbox_delete",
 		description:
-			"Delete an empty IMAP mailbox; INBOX, special-use, non-empty, and parent mailboxes are refused. Confirm-before-act: staging returns a preview plus confirmId; once approved, call again with only the confirmId",
-		inputSchema: z.union([
-			mailboxPathSchema,
-			z.object({ confirmId: z.string().min(1) }),
-		]),
+			"Delete an empty IMAP mailbox; INBOX, special-use, non-empty, and parent mailboxes are refused",
+		inputSchema: mailboxPathSchema,
 		keywords: [
 			"delete an empty folder",
 			"remove empty mailbox",
@@ -218,54 +160,17 @@ export const email: Capability[] = [
 		],
 		handler: async (rawInput, { env }) => {
 			if (!env.BUREAU) return unavailable();
-			const input = rawInput as
-				| z.infer<typeof mailboxPathSchema>
-				| { confirmId: string };
-			if (!("confirmId" in input)) {
-				const mailboxes = await env.BUREAU.listMailboxes({
-					address: input.address,
-				});
-				const mailbox = mailboxes.find((entry) => entry.path === input.path);
-				if (!mailbox) {
-					return {
-						deleted: false,
-						error: `No folder with path ${input.path} is listed for ${input.address}.`,
-					};
-				}
-				const confirmId = await stageConfirmation(
-					env,
-					"email_mailbox_delete",
-					input,
-				);
-				return {
-					confirmId,
-					preview: {
-						address: input.address,
-						path: mailbox.path,
-						...(mailbox.messages === undefined
-							? {}
-							: { messages: mailbox.messages }),
-						...(mailbox.unseen === undefined
-							? {}
-							: { unseen: mailbox.unseen }),
-					},
-					deleted: false,
-				};
-			}
-			const staged = await readConfirmation(
-				env,
-				"email_mailbox_delete",
-				input.confirmId,
-			);
-			if (!staged) {
+			const input = rawInput as z.infer<typeof mailboxPathSchema>;
+			const mailboxes = await env.BUREAU.listMailboxes({
+				address: input.address,
+			});
+			if (!mailboxes.some((entry) => entry.path === input.path)) {
 				return {
 					deleted: false,
-					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the deletion again.`,
+					error: `No folder with path ${input.path} is listed for ${input.address}.`,
 				};
 			}
-			const target = mailboxPathSchema.parse(JSON.parse(staged));
-			const removed = await env.BUREAU.deleteMailbox(target);
-			await burnConfirmation(env, "email_mailbox_delete", input.confirmId);
+			const removed = await env.BUREAU.deleteMailbox(input);
 			return { deleted: true, path: removed.path };
 		},
 	},
@@ -288,140 +193,53 @@ export const email: Capability[] = [
 	{
 		name: "email_tag_create",
 		description:
-			"Create a new mail tag; Bureau derives its permanent IMAP keyword from the name and refuses reserved or clashing ones. Confirm-before-act: the first call stages it and returns a preview plus confirmId; once approved, call again with only the confirmId",
-		inputSchema: z.union([
-			tagWriteSchema,
-			z.object({ confirmId: z.string().min(1) }),
-		]),
+			"Create a new mail tag; Bureau derives its permanent IMAP keyword from the name and refuses reserved or clashing ones",
+		inputSchema: tagWriteSchema,
 		keywords: [
 			"create a tag",
 			"new mail label",
 			"add an email tag",
 			"make a tag for",
 		],
-		handler: async (rawInput, { env }) => {
+		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
-			const input = rawInput as
-				| z.infer<typeof tagWriteSchema>
-				| { confirmId: string };
-			if (!("confirmId" in input)) {
-				const confirmId = await stageConfirmation(
-					env,
-					"email_tag_create",
-					input,
-				);
-				return { confirmId, preview: input, created: false };
-			}
-			const staged = await readConfirmation(
-				env,
-				"email_tag_create",
-				input.confirmId,
+			const created = await env.BUREAU.createTag(
+				input as z.infer<typeof tagWriteSchema>,
 			);
-			if (!staged) {
-				return {
-					created: false,
-					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the tag again.`,
-				};
-			}
-			const write = tagWriteSchema.parse(JSON.parse(staged));
-			const created = await env.BUREAU.createTag(write);
-			await burnConfirmation(env, "email_tag_create", input.confirmId);
 			return { created: true, tag: created };
 		},
 	},
 	{
 		name: "email_tag_update",
 		description:
-			"Rename or recolour a mail tag; the IMAP keyword never changes, so existing markers stay valid. Confirm-before-act: staging returns a preview plus confirmId; once approved, call again with only the confirmId",
-		inputSchema: z.union([
-			tagUpdateSchema,
-			z.object({ confirmId: z.string().min(1) }),
-		]),
+			"Rename or recolour a mail tag; the IMAP keyword never changes, so existing markers stay valid",
+		inputSchema: tagUpdateSchema,
 		keywords: [
 			"rename a tag",
 			"change tag color",
 			"edit mail label",
 		],
-		handler: async (rawInput, { env }) => {
+		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
-			const input = rawInput as
-				| z.infer<typeof tagUpdateSchema>
-				| { confirmId: string };
-			if (!("confirmId" in input)) {
-				const confirmId = await stageConfirmation(
-					env,
-					"email_tag_update",
-					input,
-				);
-				return { confirmId, preview: input, updated: false };
-			}
-			const staged = await readConfirmation(
-				env,
-				"email_tag_update",
-				input.confirmId,
+			const updated = await env.BUREAU.updateTag(
+				input as z.infer<typeof tagUpdateSchema>,
 			);
-			if (!staged) {
-				return {
-					updated: false,
-					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the change again.`,
-				};
-			}
-			const write = tagUpdateSchema.parse(JSON.parse(staged));
-			const updated = await env.BUREAU.updateTag(write);
-			await burnConfirmation(env, "email_tag_update", input.confirmId);
 			return { updated: true, tag: updated };
 		},
 	},
 	{
 		name: "email_tag_delete",
 		description:
-			"Delete a mail tag from the registry; server-side markers stay in place, and recreating the same name restores the same keyword. Confirm-before-act: staging returns a preview plus confirmId; once approved, call again with only the confirmId",
-		inputSchema: z.union([
-			z.object({ id: z.uuid() }),
-			z.object({ confirmId: z.string().min(1) }),
-		]),
+			"Delete a mail tag from the registry; server-side markers stay in place, and recreating the same name restores the same keyword",
+		inputSchema: z.object({ id: z.uuid() }),
 		keywords: [
 			"delete a tag",
 			"remove mail label",
 			"drop a mail tag",
 		],
-		handler: async (rawInput, { env }) => {
+		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
-			const input = rawInput as { id: string } | { confirmId: string };
-			if (!("confirmId" in input)) {
-				// Preview names the tag, not just its id.
-				const tags = await env.BUREAU.listTags({});
-				const tag = tags.find((entry) => entry.id === input.id);
-				if (!tag) {
-					return { deleted: false, error: `No tag with id ${input.id}.` };
-				}
-				const confirmId = await stageConfirmation(
-					env,
-					"email_tag_delete",
-					{ id: input.id },
-				);
-				return {
-					confirmId,
-					preview: { id: tag.id, name: tag.name, keyword: tag.keyword },
-					deleted: false,
-				};
-			}
-			const staged = await readConfirmation(
-				env,
-				"email_tag_delete",
-				input.confirmId,
-			);
-			if (!staged) {
-				return {
-					deleted: false,
-					error: `Confirmation ${input.confirmId} is unknown or expired. Stage the deletion again.`,
-				};
-			}
-			const target = z
-				.object({ id: z.uuid() })
-				.parse(JSON.parse(staged));
-			const removed = await env.BUREAU.deleteTag(target);
-			await burnConfirmation(env, "email_tag_delete", input.confirmId);
+			const removed = await env.BUREAU.deleteTag(input as { id: string });
 			return { deleted: true, id: removed.id };
 		},
 	},
