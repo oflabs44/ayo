@@ -285,4 +285,77 @@ describe.each(implementations)("NotebookStore: %s", (_name, createStore) => {
 		expect(top.map((d) => d.path)).toEqual(["inbox"]);
 	});
 
+	it("stores caller metadata beside the reserved keys", async () => {
+		const store = createStore();
+
+		const written = await store.write("notes/tagged", {
+			content: "Tagged",
+			title: "Tagged note",
+			metadata: { source: "chat", tags: ["memory"], pinned: true },
+		});
+		const read = await store.read("notes/tagged");
+
+		expect(written.metadata).toEqual({
+			title: "Tagged note",
+			createdAt: written.metadata.createdAt,
+			updatedAt: written.metadata.updatedAt,
+			source: "chat",
+			tags: ["memory"],
+			pinned: true,
+		});
+		expect(read!.metadata).toEqual(written.metadata);
+	});
+
+	it("inherits metadata when the field is omitted", async () => {
+		const store = createStore();
+		await store.write("notes/tagged", {
+			content: "First",
+			metadata: { source: "chat" },
+		});
+
+		const rewritten = await store.write("notes/tagged", { content: "Second" });
+
+		expect(rewritten.metadata.source).toBe("chat");
+	});
+
+	it("clears metadata with an empty object", async () => {
+		const store = createStore();
+		await store.write("notes/tagged", {
+			content: "First",
+			metadata: { source: "chat" },
+		});
+
+		const cleared = await store.write("notes/tagged", {
+			content: "Second",
+			metadata: {},
+		});
+
+		expect(cleared.metadata).toEqual({
+			title: "tagged",
+			createdAt: cleared.metadata.createdAt,
+			updatedAt: cleared.metadata.updatedAt,
+		});
+	});
+
+	it("rejects reserved metadata keys", async () => {
+		const store = createStore();
+
+		await expect(
+			store.write("notes/tagged", {
+				content: "Reserved",
+				metadata: { title: "Sneaky", source: "chat" },
+			}),
+		).rejects.toThrow("Notebook metadata keys are reserved: title");
+	});
+
+	it("rejects metadata over 8 KB", async () => {
+		const store = createStore();
+
+		await expect(
+			store.write("notes/tagged", {
+				content: "Too big",
+				metadata: { blob: "x".repeat(8 * 1_024) },
+			}),
+		).rejects.toThrow("over the 8192-byte limit");
+	});
 });

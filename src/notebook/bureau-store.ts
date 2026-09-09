@@ -3,6 +3,7 @@ import type {
 	NotebookDoc,
 	NotebookDocMeta,
 	NotebookStore,
+	NotebookWriteInput,
 } from "./store";
 
 type BureauNotebookDoc = NonNullable<
@@ -13,15 +14,7 @@ type BureauNotebookDocMeta = Awaited<
 >[number];
 
 function mapMetadata(doc: BureauNotebookDocMeta): NotebookDocMeta {
-	return {
-		path: doc.path,
-		version: doc.version,
-		metadata: {
-			title: doc.metadata.title,
-			createdAt: doc.metadata.createdAt,
-			updatedAt: doc.metadata.updatedAt,
-		},
-	};
+	return { path: doc.path, version: doc.version, metadata: doc.metadata };
 }
 
 function mapDocument(doc: BureauNotebookDoc): NotebookDoc {
@@ -31,10 +24,7 @@ function mapDocument(doc: BureauNotebookDoc): NotebookDoc {
 export class BureauNotebookStore implements NotebookStore {
 	constructor(private readonly bureau: BureauBinding) {}
 
-	async write(
-		path: string,
-		input: { content: string; title?: string },
-	): Promise<NotebookDoc> {
+	async write(path: string, input: NotebookWriteInput): Promise<NotebookDoc> {
 		return mapDocument(await this.bureau.writeNotebookDoc({ path, ...input }));
 	}
 

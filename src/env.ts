@@ -1,5 +1,9 @@
 import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
-import type { NotebookStore } from "./notebook/store";
+import type {
+	JsonObject,
+	NotebookMetadata,
+	NotebookStore,
+} from "./notebook/store";
 
 type AiBinding = {
 	run(
@@ -16,16 +20,10 @@ type AiBinding = {
 	aiGatewayLogId?: string | null;
 };
 
-type BureauNotebookMetadata = {
-	title: string;
-	createdAt: string;
-	updatedAt: string;
-};
-
 type BureauNotebookDocMeta = {
 	path: string;
 	version: string;
-	metadata: BureauNotebookMetadata;
+	metadata: NotebookMetadata;
 };
 
 type BureauNotebookDoc = BureauNotebookDocMeta & { content: string };
@@ -149,6 +147,7 @@ export type BureauBinding = {
 		path: string;
 		content: string;
 		title?: string;
+		metadata?: JsonObject;
 	}): Promise<BureauNotebookDoc>;
 	readNotebookDoc(input: {
 		path: string;

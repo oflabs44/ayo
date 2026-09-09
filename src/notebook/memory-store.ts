@@ -1,8 +1,12 @@
 import {
 	isValidNotebookPath,
+	type JsonObject,
 	type NotebookDoc,
 	type NotebookDocMeta,
+	type NotebookMetadata,
+	notebookMetadataIssue,
 	type NotebookStore,
+	type NotebookWriteInput,
 } from "./store";
 
 function validatePath(path: string): void {
@@ -11,8 +15,19 @@ function validatePath(path: string): void {
 	}
 }
 
+/** The caller-defined keys only, which is what a later write inherits. */
+function callerMetadata(metadata: NotebookMetadata): JsonObject {
+	const {
+		title: _title,
+		createdAt: _createdAt,
+		updatedAt: _updatedAt,
+		...caller
+	} = metadata;
+	return caller;
+}
+
 function copyDoc(doc: NotebookDoc): NotebookDoc {
-	return { ...doc, metadata: { ...doc.metadata } };
+	return { ...doc, metadata: structuredClone(doc.metadata) };
 }
 
 function copyMeta(doc: NotebookDoc): NotebookDocMeta {
@@ -43,19 +58,23 @@ export class InMemoryNotebookStore implements NotebookStore {
 	private version = 0;
 	private lastUpdatedAt?: string;
 
-	async write(
-		path: string,
-		input: { content: string; title?: string },
-	): Promise<NotebookDoc> {
+	async write(path: string, input: NotebookWriteInput): Promise<NotebookDoc> {
 		validatePath(path);
+		if (input.metadata !== undefined) {
+			const issue = notebookMetadataIssue(input.metadata);
+			if (issue !== undefined) throw new Error(issue);
+		}
 		const revisions = this.revisions.get(path) ?? [];
 		const existing = revisions.at(-1);
 		const updatedAt = nextTimestamp(this.lastUpdatedAt);
 		this.lastUpdatedAt = updatedAt;
+		const caller =
+			input.metadata ?? (existing ? callerMetadata(existing.metadata) : {});
 		const doc: NotebookDoc = {
 			path,
 			version: String(++this.version),
 			metadata: {
+				...structuredClone(caller),
 				title: input.title ?? path.split("/").at(-1)!,
 				createdAt: existing?.metadata.createdAt ?? updatedAt,
 				updatedAt,

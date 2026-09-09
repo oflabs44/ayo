@@ -146,6 +146,39 @@ describe("notebook capabilities", () => {
 		});
 	});
 
+	it("writes caller metadata and reads it back", async () => {
+		const { dispatch } = createDispatch();
+
+		const written = await dispatch.notebook_write!({
+			path: "notes/tagged",
+			content: "Tagged",
+			metadata: { source: "chat", tags: ["memory"] },
+		});
+		const read = await dispatch.notebook_read!({ path: "notes/tagged" });
+
+		expect(written).toMatchObject({
+			metadata: { source: "chat", tags: ["memory"] },
+		});
+		expect(read).toMatchObject({
+			metadata: { source: "chat", tags: ["memory"] },
+		});
+	});
+
+	it("rejects reserved metadata keys before calling the store", async () => {
+		vi.spyOn(console, "error").mockImplementation(() => undefined);
+		const { dispatch, store } = createDispatch();
+		const write = vi.spyOn(store, "write");
+
+		await expect(
+			dispatch.notebook_write!({
+				path: "notes/tagged",
+				content: "Reserved",
+				metadata: { title: "Sneaky" },
+			}),
+		).rejects.toBeInstanceOf(z.ZodError);
+		expect(write).not.toHaveBeenCalled();
+	});
+
 	it("rejects invalid notebook paths before calling the store", async () => {
 		vi.spyOn(console, "error").mockImplementation(() => undefined);
 		const { dispatch } = createDispatch();

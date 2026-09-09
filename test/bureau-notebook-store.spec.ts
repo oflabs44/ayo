@@ -8,6 +8,8 @@ const metadata = {
 	title: "Seat preference",
 	createdAt: "2026-08-20T10:00:00.000Z",
 	updatedAt: "2026-08-21T10:00:00.000Z",
+	source: "chat",
+	tags: ["memory"],
 };
 const document = {
 	path: "memory/aisle-seats",
@@ -138,6 +140,34 @@ describe("BureauNotebookStore", () => {
 
 		await expect(store.delete(document.path)).resolves.toBe(true);
 		expect(deleteNotebookDoc).toHaveBeenCalledWith({ path: document.path });
+	});
+
+	it("forwards caller metadata on write", async () => {
+		const { bureau, writeNotebookDoc } = createBureauMock();
+		const store = new BureauNotebookStore(bureau);
+
+		const result = await store.write(document.path, {
+			content: document.content,
+			metadata: { source: "chat", tags: ["memory"] },
+		});
+
+		expect(writeNotebookDoc).toHaveBeenCalledWith({
+			path: document.path,
+			content: document.content,
+			metadata: { source: "chat", tags: ["memory"] },
+		});
+		expect(result.metadata).toEqual(metadata);
+	});
+
+	it("preserves caller metadata on read and list", async () => {
+		const { bureau } = createBureauMock();
+		const store = new BureauNotebookStore(bureau);
+
+		const read = await store.read(document.path);
+		const [listed] = await store.list();
+
+		expect(read!.metadata).toEqual(metadata);
+		expect(listed!.metadata).toEqual(metadata);
 	});
 
 	it("resolves the test override before the Bureau binding", () => {

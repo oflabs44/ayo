@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { notebookUrl } from "../notebook/links";
 import { getNotebookStore } from "../notebook/resolve";
-import { isValidNotebookPath } from "../notebook/store";
+import {
+	isValidNotebookPath,
+	type JsonValue,
+	notebookMetadataIssue,
+} from "../notebook/store";
 import type { Capability } from "./index";
 
 const BACKEND_NOT_CONFIGURED = "The notebook backend is not configured.";
@@ -10,10 +14,29 @@ const pathSchema = z
 	.string()
 	.refine(isValidNotebookPath, { message: "Invalid notebook path" });
 
+// Annotated so the recursion stops at JsonValue instead of unfolding.
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+	z.union([
+		z.string(),
+		z.number(),
+		z.boolean(),
+		z.null(),
+		z.array(jsonValueSchema),
+		z.record(z.string(), jsonValueSchema),
+	]),
+);
+const metadataSchema = z
+	.record(z.string(), jsonValueSchema)
+	.superRefine((metadata, ctx) => {
+		const issue = notebookMetadataIssue(metadata);
+		if (issue !== undefined) ctx.addIssue({ code: "custom", message: issue });
+	});
+
 const writeInputSchema = z.object({
 	path: pathSchema,
 	content: z.string(),
 	title: z.string().optional(),
+	metadata: metadataSchema.optional(),
 });
 const readInputSchema = z.object({
 	path: pathSchema,
@@ -51,12 +74,12 @@ export const notebook: Capability[] = [
 		handler: async (input, { env }) => {
 			const store = getNotebookStore(env);
 			if (!store) return unavailable();
-			const { path, content, title } = input as z.infer<
+			const { path, content, title, metadata } = input as z.infer<
 				typeof writeInputSchema
 			>;
-			const doc = await store.write(path, { content, title });
-			const { content: _content, ...metadata } = doc;
-			return withCanonicalUrl(metadata);
+			const doc = await store.write(path, { content, title, metadata });
+			const { content: _content, ...written } = doc;
+			return withCanonicalUrl(written);
 		},
 	},
 	{
