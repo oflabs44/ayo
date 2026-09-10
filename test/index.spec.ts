@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { createExecutionContext } from "cloudflare:test";
+import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/env";
@@ -25,6 +25,7 @@ function createTestEnv(label: string): Env {
 		ACCESS_OIDC_CLIENT_ID: "access-client",
 		ACCESS_OIDC_CLIENT_SECRET: "access-secret",
 		ACCESS_OIDC_ISSUER: `${ACCESS_ISSUER_BASE}/${label}-${issuerSequence}`,
+		JOBS_DB: env.JOBS_DB,
 		OAUTH_KV: env.OAUTH_KV,
 		SEARCH_OFFLINE: "true",
 	} as Env;
@@ -256,6 +257,49 @@ describe("OAuth-protected MCP worker", () => {
 		expect(response.headers.get("WWW-Authenticate")).toContain(
 			'scope="mcp"',
 		);
+	});
+
+	it.each([
+		["upload", "GET", "PUT"],
+		["file", "PUT", "GET"],
+	])("reserves the document %s route and advertises its method", async (route, method, allow) => {
+		const response = await dispatch(
+			new Request(`${ORIGIN}/documents/${route}/bogus`, { method }),
+			createTestEnv(`document-${route}-method`),
+		);
+
+		expect(response.status).toBe(405);
+		expect(response.headers.get("Allow")).toBe(allow);
+	});
+
+	it.each([
+		["upload", "PUT"],
+		["file", "GET"],
+	])("routes an invalid document %s ticket before OAuth", async (route, method) => {
+		const testEnv = createTestEnv(`document-${route}-ticket`);
+		testEnv.FILES = {} as NonNullable<Env["FILES"]>;
+		const response = await dispatch(
+			new Request(`${ORIGIN}/documents/${route}/bogus`, { method }),
+			testEnv,
+		);
+
+		expect(response.status).toBe(410);
+	});
+
+	it("prunes expired document tickets from the scheduled handler", async () => {
+		const testEnv = createTestEnv("document-ticket-pruning");
+		await testEnv.JOBS_DB.prepare(
+			"INSERT INTO document_tickets (token_hash, kind, payload_json, expires_at) VALUES ('expired', 'download', '{}', '2000-01-01T00:00:00.000Z')",
+		).run();
+		const ctx = createExecutionContext();
+
+		await worker.scheduled({} as never, testEnv, ctx);
+		await waitOnExecutionContext(ctx);
+
+		const row = await testEnv.JOBS_DB.prepare(
+			"SELECT token_hash FROM document_tickets WHERE token_hash = 'expired'",
+		).first();
+		expect(row).toBeNull();
 	});
 
 	it("redirects canonical notebook links to Bureau", async () => {
