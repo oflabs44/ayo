@@ -6,6 +6,7 @@ import {
 	type JsonValue,
 	notebookMetadataIssue,
 } from "../notebook/store";
+import type { Env } from "../env";
 import type { Capability } from "./index";
 
 const BACKEND_NOT_CONFIGURED = "The notebook backend is not configured.";
@@ -54,8 +55,8 @@ function unavailable() {
 	return { error: BACKEND_NOT_CONFIGURED };
 }
 
-function withCanonicalUrl<Doc extends { path: string }>(doc: Doc) {
-	return { ...doc, url: notebookUrl(doc.path) };
+function withCanonicalUrl<Doc extends { path: string }>(env: Env, doc: Doc) {
+	return { ...doc, url: notebookUrl(env, doc.path) };
 }
 
 export const notebook: Capability[] = [
@@ -79,7 +80,7 @@ export const notebook: Capability[] = [
 			>;
 			const doc = await store.write(path, { content, title, metadata });
 			const { content: _content, ...written } = doc;
-			return withCanonicalUrl(written);
+			return withCanonicalUrl(env, written);
 		},
 	},
 	{
@@ -92,7 +93,7 @@ export const notebook: Capability[] = [
 			if (!store) return unavailable();
 			const { path, version } = input as z.infer<typeof readInputSchema>;
 			const doc = await store.read(path, { version });
-			return doc ? withCanonicalUrl(doc) : null;
+			return doc ? withCanonicalUrl(env, doc) : null;
 		},
 	},
 	{
@@ -110,7 +111,7 @@ export const notebook: Capability[] = [
 			const store = getNotebookStore(env);
 			if (!store) return unavailable();
 			const query = input as z.infer<typeof listInputSchema>;
-			return (await store.list(query)).map(withCanonicalUrl);
+			return (await store.list(query)).map((doc) => withCanonicalUrl(env, doc));
 		},
 	},
 	{

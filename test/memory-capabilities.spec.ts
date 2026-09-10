@@ -15,6 +15,7 @@ function createDispatch(store = new InMemoryNotebookStore()) {
 	const state = new Map<string, string>();
 	const deleteByIds = vi.fn(async () => undefined);
 	const env = {
+		PUBLIC_BASE_URL: "https://myspace.oflabs.dev",
 		SEARCH_OFFLINE: "true",
 		NOTEBOOK_STORE_FOR_TESTS: store,
 		OAUTH_KV: {
@@ -45,7 +46,7 @@ describe("memory capabilities", () => {
 			written: true,
 			path: "memory/i-prefer-aisle-seats",
 			metadata: { title: "i-prefer-aisle-seats" },
-			url: "https://ayo.oflabs.dev/notebook/memory/i-prefer-aisle-seats",
+			url: "https://myspace.oflabs.dev/notebook/memory/i-prefer-aisle-seats",
 		});
 		await expect(store.read("memory/i-prefer-aisle-seats")).resolves.toMatchObject(
 			{ content: "I prefer aisle seats." },
@@ -67,7 +68,7 @@ describe("memory capabilities", () => {
 					path: "memory/i-prefer-aisle-seats",
 					title: "i-prefer-aisle-seats",
 					content: "I prefer aisle seats.",
-					url: "https://ayo.oflabs.dev/notebook/memory/i-prefer-aisle-seats",
+					url: "https://myspace.oflabs.dev/notebook/memory/i-prefer-aisle-seats",
 				},
 			],
 			message:
@@ -87,7 +88,7 @@ describe("memory capabilities", () => {
 		expect(result).toMatchObject({
 			written: true,
 			path: "memory/i-prefer-aisle-seats-2",
-			url: "https://ayo.oflabs.dev/notebook/memory/i-prefer-aisle-seats-2",
+			url: "https://myspace.oflabs.dev/notebook/memory/i-prefer-aisle-seats-2",
 		});
 	});
 
@@ -105,7 +106,7 @@ describe("memory capabilities", () => {
 				title: "i-prefer-aisle-seats-on-flights",
 				content: "I prefer aisle seats on flights.",
 				updatedAt: expect.any(String),
-				url: "https://ayo.oflabs.dev/notebook/memory/i-prefer-aisle-seats-on-flights",
+				url: "https://myspace.oflabs.dev/notebook/memory/i-prefer-aisle-seats-on-flights",
 			}),
 		]);
 		expect(result).not.toEqual([expect.objectContaining({ score: expect.anything() })]);
