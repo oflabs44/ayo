@@ -28,7 +28,7 @@ against those capabilities, instead of one MCP tool per capability.
 - `src/oauth/` — Cloudflare Access OIDC login flow, consent gate, and the
   `/notebook/*` canonical-link redirect
 - `src/capabilities/` — the registry: one file per domain (`meta`, `notebook`,
-  `memory`, `email`), keyed and flattened in `index.ts`
+  `documents`, `memory`, `email`), keyed and flattened in `index.ts`
 - `src/search.ts` — search modes, lexical scoring, embeddings, RRF fusion
 - `src/execute.ts` — codemode sandbox and the `ayo.*` dispatch table
 - `src/notebook/` — `NotebookStore` contract, in-memory reference store,
@@ -64,6 +64,10 @@ against those capabilities, instead of one MCP tool per capability.
   open beta on the Workers paid plan.
 - `BUREAU` — service binding to the `BureauRpc` entrypoint on the `bureau`
   Worker, used as the production notebook backend.
+- `FILES` — service binding to the `FilesRpc` entrypoint on the `bureau-files`
+  Worker, used as the production documents backend. The `FilesBinding` type in
+  `src/env.ts` mirrors that entrypoint's final contract; list and bulk calls
+  return `PublicDocumentSummary`, while detail calls return `PublicDocument`.
 - `ACCESS_OIDC_CLIENT_ID` — Access for SaaS OIDC client ID.
 - `ACCESS_OIDC_CLIENT_SECRET` — Access for SaaS OIDC client secret.
 - `ACCESS_OIDC_ISSUER` — Access for SaaS OIDC issuer, including the application
@@ -90,6 +94,29 @@ against those capabilities, instead of one MCP tool per capability.
   builds them from `PUBLIC_BASE_URL` under `/notebook/`.
 - `src/notebook/bureau-store.ts` adapts Bureau's `BureauRpc` notebook methods to
   `NotebookStore`. The test override remains first in backend resolution.
+
+## Documents
+
+- Unlike notebook, documents capabilities call the `FILES` binding directly
+  (no store abstraction), matching the email/calendar/tasks/contacts pattern.
+- `document_search` calls `listDocuments` and switches to `searchDocuments`
+  only when a `query` is present. Both return a cursor page, which the
+  capability projects to a compact summary; `ocrText` is reachable through
+  `document_read` alone, never in a list.
+- Tag writes split by intent: `document_tags_set` replaces the whole set
+  through `updateDocumentTags`, and `document_tags_update` applies deltas
+  through the atomic `changeDocumentTags`.
+- Local-file upload and file download cross Ayo's boundary through a
+  single-use ticket, not through the MCP `execute` sandbox: `document_upload`
+  and `document_file` mint a five-minute ticket and return an unauthenticated
+  URL under `/documents/upload/:token` (PUT) or `/documents/file/:token`
+  (GET). `src/documents/routes.ts` streams the request body straight to
+  `FILES.uploadDocument` without buffering, or streams `getDocumentFile`'s or
+  `getDocumentPreview`'s `Response` straight back.
+- Ticket consumption (`src/documents/tickets.ts`) is genuinely single-use. The
+  token is 256 random bits, only its SHA-256 is stored, and consumption is one
+  `DELETE ... WHERE ... RETURNING payload_json` against `JOBS_DB`, so two
+  racing requests cannot both win. The scheduled handler prunes expired rows.
 
 ## Capability authoring rule
 

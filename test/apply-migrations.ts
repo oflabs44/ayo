@@ -16,6 +16,7 @@ await applyD1Migrations(testEnv.JOBS_DB, testEnv.TEST_MIGRATIONS);
 
 beforeEach(async () => {
 	await testEnv.JOBS_DB.batch([
+		testEnv.JOBS_DB.prepare("DELETE FROM document_tickets"),
 		testEnv.JOBS_DB.prepare("DELETE FROM job_runs"),
 		testEnv.JOBS_DB.prepare("DELETE FROM jobs"),
 	]);

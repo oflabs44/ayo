@@ -113,6 +113,33 @@ describe("capability search", () => {
 					],
 				},
 				{
+					domain: "documents",
+					description:
+						"Search, read, update, move, trash, restore, and reprocess documents; manage folders and tags; upload and download files",
+					capabilities: [
+						"document_search",
+						"document_read",
+						"document_update",
+						"document_move",
+						"document_trash",
+						"document_restore",
+						"document_retry_processing",
+						"document_correspondents",
+						"document_folders",
+						"document_folder_create",
+						"document_folder_update",
+						"document_folder_delete",
+						"document_tags",
+						"document_tag_create",
+						"document_tag_update",
+						"document_tag_delete",
+						"document_tags_set",
+						"document_tags_update",
+						"document_upload",
+						"document_file",
+					],
+				},
+				{
 					domain: "jobs",
 					description:
 						"Schedule, inspect, run, update, and remove unattended scripts",
@@ -257,6 +284,26 @@ describe("capability search", () => {
 					expect.stringContaining("contact_read\ncontacts"),
 					expect.stringContaining("contact_create\ncontacts"),
 					expect.stringContaining("contact_delete\ncontacts"),
+					expect.stringContaining("document_search\ndocuments"),
+					expect.stringContaining("document_read\ndocuments"),
+					expect.stringContaining("document_update\ndocuments"),
+					expect.stringContaining("document_move\ndocuments"),
+					expect.stringContaining("document_trash\ndocuments"),
+					expect.stringContaining("document_restore\ndocuments"),
+					expect.stringContaining("document_retry_processing\ndocuments"),
+					expect.stringContaining("document_correspondents\ndocuments"),
+					expect.stringContaining("document_folders\ndocuments"),
+					expect.stringContaining("document_folder_create\ndocuments"),
+					expect.stringContaining("document_folder_update\ndocuments"),
+					expect.stringContaining("document_folder_delete\ndocuments"),
+					expect.stringContaining("document_tags\ndocuments"),
+					expect.stringContaining("document_tag_create\ndocuments"),
+					expect.stringContaining("document_tag_update\ndocuments"),
+					expect.stringContaining("document_tag_delete\ndocuments"),
+					expect.stringContaining("document_tags_set\ndocuments"),
+					expect.stringContaining("document_tags_update\ndocuments"),
+					expect.stringContaining("document_upload\ndocuments"),
+					expect.stringContaining("document_file\ndocuments"),
 					expect.stringContaining("job_create\njobs"),
 					expect.stringContaining("job_list\njobs"),
 					expect.stringContaining("job_read\njobs"),
@@ -438,6 +485,86 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:document_search",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_read",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_update",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_move",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_trash",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_restore",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_retry_processing",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_correspondents",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_folders",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_folder_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_folder_update",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_folder_delete",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_tags",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_tag_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_tag_update",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_tag_delete",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_tags_set",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_tags_update",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_upload",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:document_file",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:job_create",
 				namespace: "capabilities",
 			}),
@@ -467,8 +594,7 @@ describe("capability search", () => {
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 45,
-			topK: 48,
+			topK: 68,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(
