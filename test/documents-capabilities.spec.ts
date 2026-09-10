@@ -96,7 +96,11 @@ function createHarness() {
 		getDocumentFile: vi.fn(),
 		getDocumentPreview: vi.fn(),
 	} as unknown as FilesBinding;
-	const env = { FILES: files, JOBS_DB: bindings.JOBS_DB } as unknown as Env;
+	const env = {
+		PUBLIC_BASE_URL: "https://myspace.oflabs.dev",
+		FILES: files,
+		JOBS_DB: bindings.JOBS_DB,
+	} as unknown as Env;
 
 	return { files, dispatch: buildDispatchTable(documents, env, props) };
 }
@@ -343,7 +347,7 @@ describe("documents capabilities", () => {
 
 		expect(upload.method).toBe("PUT");
 		expect(upload.uploadUrl).toMatch(
-			/^https:\/\/ayo\.oflabs\.dev\/documents\/upload\/[A-Za-z0-9_-]{43}$/,
+			/^https:\/\/myspace\.oflabs\.dev\/documents\/upload\/[A-Za-z0-9_-]{43}$/,
 		);
 		expect(upload.maxSizeBytes).toBe(50 * 1024 * 1024);
 	});
@@ -373,7 +377,7 @@ describe("documents capabilities", () => {
 		};
 
 		expect(download.downloadUrl).toMatch(
-			/^https:\/\/ayo\.oflabs\.dev\/documents\/file\/[A-Za-z0-9_-]{43}$/,
+			/^https:\/\/myspace\.oflabs\.dev\/documents\/file\/[A-Za-z0-9_-]{43}$/,
 		);
 		expect(download.variant).toBe("original");
 		expect(download.filename).toBe("invoice.pdf");

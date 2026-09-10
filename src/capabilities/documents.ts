@@ -490,7 +490,7 @@ export const documents: Capability[] = [
 			const upload = input as z.infer<typeof uploadInputSchema>;
 			const { token, expiresAt } = await createTicket(env, "upload", upload);
 			return {
-				uploadUrl: documentUploadUrl(token),
+				uploadUrl: documentUploadUrl(env, token),
 				method: "PUT",
 				headers: { "Content-Type": upload.mime },
 				maxSizeBytes: MAX_UPLOAD_BYTES,
@@ -521,7 +521,7 @@ export const documents: Capability[] = [
 				variant,
 			});
 			return {
-				downloadUrl: documentFileUrl(token),
+				downloadUrl: documentFileUrl(env, token),
 				variant,
 				filename: document.originalName,
 				mimeType: variant === "preview" ? null : document.mimeType,

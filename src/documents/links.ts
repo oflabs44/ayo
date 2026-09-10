@@ -1,10 +1,10 @@
-// Single authority for Ayo's document upload and download route URLs.
-const DOCUMENTS_BASE_URL = "https://ayo.oflabs.dev/documents";
+import type { Env } from "../env";
 
-export function documentUploadUrl(token: string): string {
-	return `${DOCUMENTS_BASE_URL}/upload/${token}`;
+// Single authority for Ayo's document upload and download route URLs.
+export function documentUploadUrl(env: Env, token: string): string {
+	return `${env.PUBLIC_BASE_URL}/documents/upload/${token}`;
 }
 
-export function documentFileUrl(token: string): string {
-	return `${DOCUMENTS_BASE_URL}/file/${token}`;
+export function documentFileUrl(env: Env, token: string): string {
+	return `${env.PUBLIC_BASE_URL}/documents/file/${token}`;
 }
