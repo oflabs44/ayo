@@ -12,7 +12,10 @@ const props: OwnerProps = {
 };
 
 function createDispatch(store = new InMemoryNotebookStore()) {
-	const env = { NOTEBOOK_STORE_FOR_TESTS: store } as Env;
+	const env = {
+		PUBLIC_BASE_URL: "https://myspace.oflabs.dev",
+		NOTEBOOK_STORE_FOR_TESTS: store,
+	} as Env;
 	return { dispatch: buildDispatchTable(notebook, env, props), store };
 }
 
@@ -39,14 +42,14 @@ describe("notebook capabilities", () => {
 			path: "notes/aisle-seats",
 			metadata: { title: "Seat preference" },
 			sourceUrl: "https://source.example/notes/aisle-seats",
-			url: "https://ayo.oflabs.dev/notebook/notes/aisle-seats",
+			url: "https://myspace.oflabs.dev/notebook/notes/aisle-seats",
 		});
 		expect(written).not.toHaveProperty("content");
 		expect(read).toMatchObject({
 			path: "notes/aisle-seats",
 			content: "I prefer aisle seats.",
 			metadata: { title: "Seat preference" },
-			url: "https://ayo.oflabs.dev/notebook/notes/aisle-seats",
+			url: "https://myspace.oflabs.dev/notebook/notes/aisle-seats",
 		});
 	});
 
@@ -95,8 +98,8 @@ describe("notebook capabilities", () => {
 			"notes/z-last",
 		]);
 		expect(listed.map(({ url }) => url)).toEqual([
-			"https://ayo.oflabs.dev/notebook/notes/a-first",
-			"https://ayo.oflabs.dev/notebook/notes/z-last",
+			"https://myspace.oflabs.dev/notebook/notes/a-first",
+			"https://myspace.oflabs.dev/notebook/notes/z-last",
 		]);
 		expect(listed.every((doc) => !("content" in doc))).toBe(true);
 	});

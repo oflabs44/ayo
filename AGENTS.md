@@ -42,6 +42,10 @@ against those capabilities, instead of one MCP tool per capability.
 
 ## Bindings and secrets
 
+- `PUBLIC_BASE_URL` — the Worker's public origin (`https://myspace.oflabs.dev`),
+  set as a plain var in `wrangler.jsonc`. Every canonical link Ayo hands out is
+  built from it; no module hardcodes the host. Change it and the route pattern
+  together, and update the Access callback URL to match.
 - `OAUTH_KV` — KV namespace for OAuth clients, grants, tokens, and the
   `search:capabilities:content-stamp`; replace the placeholder namespace ID in
   `wrangler.jsonc` before deployment.
@@ -82,8 +86,8 @@ against those capabilities, instead of one MCP tool per capability.
   code depends on this interface, not a backend implementation. Contract v2
   retains revisions, supports versioned reads and history, and provides
   segment-aware recursive listing with ordering and limits.
-- `src/notebook/links.ts` is the authority for canonical notebook links under
-  `https://ayo.oflabs.dev/notebook/`.
+- `src/notebook/links.ts` is the authority for canonical notebook links; it
+  builds them from `PUBLIC_BASE_URL` under `/notebook/`.
 - `src/notebook/bureau-store.ts` adapts Bureau's `BureauRpc` notebook methods to
   `NotebookStore`. The test override remains first in backend resolution.
 

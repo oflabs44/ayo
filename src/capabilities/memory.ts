@@ -93,7 +93,7 @@ export const memory: Capability[] = [
 					path,
 					title,
 					content,
-					url: notebookUrl(path),
+					url: notebookUrl(env, path),
 				}));
 			if (related.length > 0 && !force) {
 				return {
@@ -108,7 +108,7 @@ export const memory: Capability[] = [
 			const doc = await store.write(resolvedPath, { content });
 			await syncMemoryIndex(env, store);
 			const { content: _content, ...metadata } = doc;
-			return { written: true, ...metadata, url: notebookUrl(doc.path) };
+			return { written: true, ...metadata, url: notebookUrl(env, doc.path) };
 		},
 	},
 	{
@@ -131,7 +131,7 @@ export const memory: Capability[] = [
 					title,
 					content,
 					updatedAt,
-					url: notebookUrl(path),
+					url: notebookUrl(env, path),
 				}),
 			);
 		},
