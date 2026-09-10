@@ -54,5 +54,10 @@
 			"service": "bureau",
 			"entrypoint": "BureauRpc",
 		},
+		{
+			"binding": "FILES",
+			"service": "bureau-files",
+			"entrypoint": "FilesRpc",
+		},
 	],
 }

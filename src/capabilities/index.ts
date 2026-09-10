@@ -3,6 +3,7 @@ import type { Env, OwnerProps } from "../env";
 import { ai } from "./ai";
 import { calendar } from "./calendar";
 import { contacts } from "./contacts";
+import { documents } from "./documents";
 import { email } from "./email";
 import { jobs } from "./jobs";
 import { memory } from "./memory";
@@ -56,6 +57,14 @@ export const capabilityRegistry = {
 	contacts: {
 		description: "Look up, save, and remove people in the address book",
 		capabilities: contacts,
+	},
+	// Declared after email: search breaks score ties by declaration order, and
+	// documents' folder/tag vocabulary overlaps email's, so this preserves
+	// email's existing tie-breaks instead of outranking them.
+	documents: {
+		description:
+			"Search, read, update, move, trash, restore, and reprocess documents; manage folders and tags; upload and download files",
+		capabilities: documents,
 	},
 	jobs: {
 		description: "Schedule, inspect, run, update, and remove unattended scripts",

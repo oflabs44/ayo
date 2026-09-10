@@ -294,6 +294,159 @@ export type BureauBinding = {
 	}): Promise<{ id: string }>;
 };
 
+export type DocumentType =
+	| "invoice"
+	| "contract"
+	| "notice"
+	| "statement"
+	| "reminder"
+	| "letter"
+	| "other";
+export type OcrStatus = "pending" | "processing" | "completed" | "failed";
+export type ProcessingStatus = "pending" | "processing" | "completed" | "failed";
+
+export type PublicDocument = {
+	id: string;
+	/** Falls back to `originalName` while `titleOverride` is null. */
+	title: string;
+	titleOverride: string | null;
+	originalName: string;
+	mimeType: string;
+	size: number;
+	checksum: string;
+	folderId: string | null;
+	folder: { id: string; name: string; path: string } | null;
+	tags: Array<{ id: string; name: string }>;
+	correspondent: string | null;
+	type: DocumentType | null;
+	receivedOn: string | null;
+	notes: string | null;
+	processingStatus: ProcessingStatus;
+	ocrStatus: OcrStatus;
+	ocrText: string | null;
+	ocrError: string | null;
+	pageCount: number | null;
+	ocrCompletedAt: string | null;
+	preview: { kind: "image" | "pdf" | "unsupported" };
+	createdAt: string;
+	updatedAt: string;
+	deletedAt: string | null;
+};
+
+/** `listDocuments`/`searchDocuments`/`moveDocuments`/`trashDocuments` shape:
+ * every `PublicDocument` field except the ones a list page should not carry. */
+export type PublicDocumentSummary = Omit<
+	PublicDocument,
+	"checksum" | "notes" | "ocrText"
+>;
+
+export type DocumentListInput = {
+	query?: string;
+	/** A folder id, or the literal "unfiled" for documents in no folder. */
+	folderId?: string;
+	tagIds?: string[];
+	correspondents?: string[];
+	types?: DocumentType[];
+	ocrStatuses?: OcrStatus[];
+	processingStatuses?: ProcessingStatus[];
+	receivedFrom?: string;
+	receivedTo?: string;
+	trashed?: boolean;
+	limit?: number;
+	cursor?: string;
+};
+
+export type DocumentPage = {
+	documents: PublicDocumentSummary[];
+	nextCursor: string | null;
+};
+
+export type DocumentUpdateInput = {
+	id: string;
+	title?: string | null;
+	correspondent?: string | null;
+	type?: DocumentType | null;
+	receivedOn?: string | null;
+	notes?: string | null;
+};
+
+type DocumentFolder = {
+	id: string;
+	parentId: string | null;
+	name: string;
+	createdAt: string;
+	updatedAt: string;
+	depth: number;
+	path: string;
+	documentCount: number;
+};
+type DocumentTag = {
+	id: string;
+	name: string;
+	documentCount: number;
+	createdAt: string;
+};
+
+/** Bureau's `bureau-files` FilesRpc WorkerEntrypoint. */
+export type FilesBinding = {
+	listDocuments(input: DocumentListInput): Promise<DocumentPage>;
+	searchDocuments(
+		input: DocumentListInput & { query: string },
+	): Promise<DocumentPage>;
+	getDocument(input: { id: string }): Promise<PublicDocument | null>;
+	listCorrespondents(input: Record<string, never>): Promise<string[]>;
+	updateDocument(input: DocumentUpdateInput): Promise<PublicDocument>;
+	/** Full replacement of the document's tag set. */
+	updateDocumentTags(input: {
+		id: string;
+		tagIds: string[];
+	}): Promise<PublicDocument>;
+	/** Atomic add-and-remove delta against the document's tag set. */
+	changeDocumentTags(input: {
+		id: string;
+		addTagIds?: string[];
+		removeTagIds?: string[];
+	}): Promise<PublicDocument>;
+	moveDocuments(input: {
+		ids: string[];
+		folderId: string | null;
+	}): Promise<PublicDocumentSummary[]>;
+	trashDocuments(input: { ids: string[] }): Promise<PublicDocumentSummary[]>;
+	restoreDocument(input: { id: string }): Promise<PublicDocument>;
+	retryDocumentProcessing(input: { id: string }): Promise<PublicDocument>;
+	listDocumentFolders(input: Record<string, never>): Promise<DocumentFolder[]>;
+	createDocumentFolder(input: {
+		name: string;
+		parentId?: string | null;
+	}): Promise<DocumentFolder>;
+	updateDocumentFolder(input: {
+		id: string;
+		name?: string;
+		parentId?: string | null;
+	}): Promise<DocumentFolder>;
+	deleteDocumentFolder(input: { id: string }): Promise<{ deleted: true }>;
+	listDocumentTags(input: Record<string, never>): Promise<DocumentTag[]>;
+	createDocumentTag(input: { name: string }): Promise<DocumentTag>;
+	updateDocumentTag(input: { id: string; name: string }): Promise<DocumentTag>;
+	deleteDocumentTag(input: { id: string }): Promise<{ deleted: true }>;
+	/** Streams the request body straight through; callers must not buffer it. */
+	uploadDocument(
+		input: {
+			filename: string;
+			mime: string;
+			size: number;
+			title?: string | null;
+			folderId?: string | null;
+		},
+		body: ReadableStream<Uint8Array>,
+	): Promise<{
+		status: "created" | "existing" | "restored";
+		document: PublicDocument;
+	}>;
+	getDocumentFile(input: { id: string }): Promise<Response>;
+	getDocumentPreview(input: { id: string }): Promise<Response>;
+};
+
 type VectorizeBinding = {
 	deleteByIds(ids: string[]): Promise<unknown>;
 	upsert(
@@ -319,6 +472,7 @@ export type Env = {
 	AI?: AiBinding;
 	AI_GATEWAY_ID?: string;
 	BUREAU?: BureauBinding;
+	FILES?: FilesBinding;
 	JOBS_DB: D1Database;
 	LOADER?: WorkerLoader;
 	NOTEBOOK_STORE_FOR_TESTS?: NotebookStore;
