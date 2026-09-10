@@ -42,10 +42,13 @@ against those capabilities, instead of one MCP tool per capability.
 
 ## Bindings and secrets
 
-- `PUBLIC_BASE_URL` — the Worker's public origin (`https://myspace.oflabs.dev`),
+- `PUBLIC_BASE_URL` — the Worker's public origin (`https://ayo.oflabs.dev`),
   set as a plain var in `wrangler.jsonc`. Every canonical link Ayo hands out is
   built from it; no module hardcodes the host. Change it and the route pattern
-  together, and update the Access callback URL to match.
+  together, and update the Access callback URL to match. Check the account's
+  custom domains (`GET /accounts/<id>/workers/domains`) before claiming a
+  host: a custom domain already held by another Worker moves silently, which
+  is how `myspace.oflabs.dev` was briefly taken from `bureau-web`.
 - `OAUTH_KV` — KV namespace for OAuth clients, grants, tokens, and the
   `search:capabilities:content-stamp`; replace the placeholder namespace ID in
   `wrangler.jsonc` before deployment.

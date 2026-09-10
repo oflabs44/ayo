@@ -4,7 +4,7 @@
 	"compatibility_date": "2026-08-18",
 	"routes": [
 		{
-			"pattern": "myspace.oflabs.dev",
+			"pattern": "ayo.oflabs.dev",
 			"custom_domain": true,
 		},
 	],
@@ -17,7 +17,7 @@
 	"vars": {
 		// Public origin of this Worker; the authority for every canonical link
 		// Ayo hands out. Keep it in step with the route pattern above.
-		"PUBLIC_BASE_URL": "https://myspace.oflabs.dev",
+		"PUBLIC_BASE_URL": "https://ayo.oflabs.dev",
 		// The account's default AI Gateway. A named gateway was tried in Jerry
 		// and third-party models fail through it (credential resolution only
 		// works via the default); re-test if the unified-billing surface changes.

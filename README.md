@@ -22,7 +22,7 @@ compact:
 Capabilities live behind that surface as plain typed modules. Live domains:
 the **notebook** (markdown pages with versions and history, stored in my
 Bureau workspace over a service binding, readable at stable
-`myspace.oflabs.dev/notebook/...` links behind my own auth) and **memory** — a
+`ayo.oflabs.dev/notebook/...` links behind my own auth) and **memory** — a
 considered rebuild of my earlier Jerry experiment — filed as notebook pages
 with verify-first writes and ambient recall. Automations (a scheduled brief of
 the day) are the next direction.

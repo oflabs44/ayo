@@ -324,7 +324,7 @@ export type Env = {
 	NOTEBOOK_STORE_FOR_TESTS?: NotebookStore;
 	OAUTH_KV: KVNamespace;
 	OAUTH_PROVIDER: OAuthHelpers;
-	/** Public origin of this Worker, e.g. https://myspace.oflabs.dev */
+	/** Public origin of this Worker, e.g. https://ayo.oflabs.dev */
 	PUBLIC_BASE_URL: string;
 	SEARCH_OFFLINE?: string;
 	VECTORIZE?: VectorizeBinding;
