@@ -68,6 +68,7 @@ type BureauCalendarEvent = {
 	location: string | null;
 	description: string | null;
 	rrule?: string;
+	alarms: BureauAlarmRead[];
 	status: string | null;
 	etag: string;
 };
@@ -82,7 +83,7 @@ type BureauCalendarEventWrite = {
 	location?: string;
 	description?: string;
 	rrule?: string;
-	alarms?: BureauAlarm[];
+	alarms?: BureauAlarmWrite[];
 };
 type BureauTodo = {
 	id: string;
@@ -90,9 +91,12 @@ type BureauTodo = {
 	uid: string;
 	summary: string | null;
 	status: string | null;
+	start: string | null;
 	due: string | null;
 	completed: string | null;
 	priority: number | null;
+	rrule?: string;
+	alarms: BureauAlarmRead[];
 	etag: string;
 };
 type BureauTag = {
@@ -115,31 +119,42 @@ type BureauContactWrite = {
 	addressbook: string;
 	fn: string;
 } & Record<string, unknown>;
-type BureauAlarm = {
+type BureauAlarmRead = {
+	trigger: string;
+	action?: string;
+	related?: "START" | "END";
+	description?: string;
+};
+type BureauAlarmWrite = {
 	trigger: string;
 	action?: "DISPLAY" | "EMAIL" | "AUDIO";
+	related?: "START" | "END";
 	description?: string;
 };
 type BureauTodoCreate = {
 	address: string;
 	calendar: string;
 	summary: string;
+	start?: string;
 	due?: string;
 	description?: string;
 	priority?: number;
 	status?: string;
-	alarms?: BureauAlarm[];
+	rrule?: string;
+	alarms?: BureauAlarmWrite[];
 };
 type BureauTodoUpdate = {
 	address: string;
 	id: string;
 	etag?: string;
 	status?: string;
+	start?: string | null;
 	due?: string | null;
 	summary?: string | null;
 	description?: string | null;
 	priority?: number | null;
-	alarms?: BureauAlarm[] | null;
+	rrule?: string | null;
+	alarms?: BureauAlarmWrite[] | null;
 };
 
 export type BureauBinding = {
@@ -199,6 +214,7 @@ export type BureauBinding = {
 		address: string;
 		folder?: string;
 		threadId?: string;
+		tag?: string;
 		limit?: number;
 		before?: string;
 	}): Promise<unknown[]>;

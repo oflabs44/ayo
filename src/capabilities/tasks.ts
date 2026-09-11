@@ -11,6 +11,7 @@ const calendarTimeSchema = z.union([z.iso.date(), calendarDateTimeSchema]);
 const alarmSchema = z.object({
 	trigger: z.string().min(1),
 	action: z.enum(["DISPLAY", "EMAIL", "AUDIO"]).optional(),
+	related: z.enum(["START", "END"]).optional(),
 	description: z.string().optional(),
 });
 const listTasksSchema = accountSchema.extend({
@@ -18,32 +19,58 @@ const listTasksSchema = accountSchema.extend({
 	status: z.string().min(1).optional(),
 	dueBefore: calendarTimeSchema.optional(),
 });
-const taskCreateBodySchema = z.object({
-	calendar: z.uuid(),
-	summary: z.string().min(1),
-	due: calendarTimeSchema.optional(),
-	description: z.string().optional(),
-	priority: z.int().min(0).max(9).optional(),
-	status: z.string().min(1).optional(),
-	alarms: z.array(alarmSchema).optional(),
-});
+const taskCreateBodySchema = z
+	.object({
+		calendar: z.uuid(),
+		summary: z.string().min(1),
+		start: calendarTimeSchema
+			.optional()
+			.describe("Required when rrule is set"),
+		due: calendarTimeSchema.optional(),
+		description: z.string().optional(),
+		priority: z.int().min(0).max(9).optional(),
+		status: z.string().min(1).optional(),
+		rrule: z.string().min(1).optional(),
+		alarms: z.array(alarmSchema).optional(),
+	})
+	.superRefine((input, context) => {
+		if (input.rrule !== undefined && input.start === undefined) {
+			context.addIssue({
+				code: "custom",
+				message: "Recurring tasks require a start date or date-time",
+			});
+		}
+		if (
+			input.alarms?.some((alarm) => alarm.related === "END") &&
+			input.due === undefined
+		) {
+			context.addIssue({
+				code: "custom",
+				message: "Task alarms related to END require a due date or date-time",
+			});
+		}
+	});
 const createTaskSchema = taskCreateBodySchema.safeExtend(accountSchema.shape);
 const taskUpdateBodySchema = z
 	.object({
 		status: z.string().min(1).optional(),
+		start: calendarTimeSchema.nullable().optional(),
 		due: calendarTimeSchema.nullable().optional(),
 		summary: z.string().min(1).nullable().optional(),
 		description: z.string().nullable().optional(),
 		priority: z.int().min(0).max(9).nullable().optional(),
+		rrule: z.string().min(1).nullable().optional(),
 		alarms: z.array(alarmSchema).nullable().optional(),
 	})
 	.refine(
 		(input) =>
 			input.status !== undefined ||
+			input.start !== undefined ||
 			input.due !== undefined ||
 			input.summary !== undefined ||
 			input.description !== undefined ||
 			input.priority !== undefined ||
+			input.rrule !== undefined ||
 			input.alarms !== undefined,
 		{ message: "At least one todo field is required" },
 	);
@@ -97,12 +124,14 @@ export const tasks: Capability[] = [
 	{
 		name: "task_create",
 		description:
-			"Add a task or todo item to a calendar collection, optionally with reminder alarms; use calendar_calendars first to find the calendar UUID",
+			"Add a task or todo item to a calendar collection, optionally with recurrence and reminder alarms; recurring tasks require a start date or date-time, and calendar_calendars lists calendar UUIDs",
 		inputSchema: createTaskSchema,
 		keywords: [
 			"create task",
 			"add a task",
 			"new todo",
+			"recurring task",
+			"daily todo",
 			"remember to",
 			"put task on list",
 		],
@@ -116,7 +145,7 @@ export const tasks: Capability[] = [
 	{
 		name: "task_update",
 		description:
-			"Change a task's title, due date, reminder alarms, description, priority, or status; mark it done by setting status to COMPLETED. Fields other than status can be null to clear them, and an ETag from task_read can make the update safe",
+			"Change a task's title, start, due date, recurrence, reminder alarms, description, priority, or status; mark it done by setting status to COMPLETED. Recurring tasks require a start; fields other than status can be null to clear them, and an ETag from task_read can make the update safe",
 		inputSchema: updateTaskSchema,
 		keywords: [
 			"update task",

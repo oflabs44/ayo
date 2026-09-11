@@ -44,6 +44,7 @@ const eventWrite = {
 		{
 			trigger: "-PT15M",
 			action: "DISPLAY" as const,
+			related: "END" as const,
 			description: "Planning soon",
 		},
 	],
@@ -98,11 +99,30 @@ describe("calendar capabilities", () => {
 		).rejects.toThrow("to must be later than from");
 	});
 
-	it("reads one event with the exact Bureau RPC shape", async () => {
+	it("reads one event with its projected alarms", async () => {
 		const { bureau, dispatch } = createHarness();
+		const alarms = [
+			{ trigger: "-PT15M", action: "DISPLAY" as const, related: "END" as const },
+		];
+		vi.mocked(bureau.getEvent).mockResolvedValueOnce({
+			id: eventId,
+			calendar: calendarId,
+			uid: "planning@example.com",
+			summary: "Planning",
+			start: "2026-08-24T08:00:00.000Z",
+			end: "2026-08-24T09:00:00.000Z",
+			allDay: false,
+			location: null,
+			description: null,
+			alarms,
+			status: "CONFIRMED",
+			etag: '"event-v2"',
+			raw: "BEGIN:VCALENDAR...",
+		});
 
-		await dispatch.calendar_event_read!({ address, id: eventId });
-
+		await expect(
+			dispatch.calendar_event_read!({ address, id: eventId }),
+		).resolves.toMatchObject({ alarms });
 		expect(bureau.getEvent).toHaveBeenCalledWith({ address, id: eventId });
 	});
 
