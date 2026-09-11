@@ -473,6 +473,9 @@ export type Env = {
 	AI_GATEWAY_ID?: string;
 	BUREAU?: BureauBinding;
 	FILES?: FilesBinding;
+	/** Test-only seam for direct GitHub REST calls. */
+	GITHUB_FETCH_FOR_TESTS?: typeof fetch;
+	GITHUB_TOKEN?: string;
 	JOBS_DB: D1Database;
 	LOADER?: WorkerLoader;
 	NOTEBOOK_STORE_FOR_TESTS?: NotebookStore;

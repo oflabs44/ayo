@@ -25,7 +25,8 @@ Bureau workspace over a service binding, readable at stable
 `ayo.oflabs.dev/notebook/...` links behind my own auth) and **memory** — a
 considered rebuild of my earlier Jerry experiment — filed as notebook pages
 with verify-first writes and ambient recall. Automations (a scheduled brief of
-the day) are the next direction.
+the day) are the next direction. GitHub issue reporting is limited to
+`oflabs44/ayo` and `oflabs44/bureau`.
 
 Single-user by design: no tenancy, no signup, my data only.
 
@@ -42,4 +43,11 @@ Vectorize + Workers AI (search and recall) · Dynamic Workers via
 pnpm install
 pnpm dev
 pnpm test
+```
+
+GitHub issue capabilities require a fine-grained PAT with Issues read-and-write
+access, limited to `oflabs44/ayo` and `oflabs44/bureau`:
+
+```sh
+pnpm exec wrangler secret put GITHUB_TOKEN
 ```

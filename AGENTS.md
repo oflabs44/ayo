@@ -28,7 +28,7 @@ against those capabilities, instead of one MCP tool per capability.
 - `src/oauth/` — Cloudflare Access OIDC login flow, consent gate, and the
   `/notebook/*` canonical-link redirect
 - `src/capabilities/` — the registry: one file per domain (`meta`, `notebook`,
-  `documents`, `memory`, `email`), keyed and flattened in `index.ts`
+  `documents`, `memory`, `email`, `github`), keyed and flattened in `index.ts`
 - `src/search.ts` — search modes, lexical scoring, embeddings, RRF fusion
 - `src/execute.ts` — codemode sandbox and the `ayo.*` dispatch table
 - `src/notebook/` — `NotebookStore` contract, in-memory reference store,
@@ -71,6 +71,10 @@ against those capabilities, instead of one MCP tool per capability.
   Worker, used as the production documents backend. The `FilesBinding` type in
   `src/env.ts` mirrors that entrypoint's final contract; list and bulk calls
   return `PublicDocumentSummary`, while detail calls return `PublicDocument`.
+- `GITHUB_TOKEN` — Worker secret for direct GitHub REST calls. Set it with
+  `pnpm exec wrangler secret put GITHUB_TOKEN`. Use a fine-grained PAT limited
+  to exactly `oflabs44/ayo` and `oflabs44/bureau`, with Issues read-and-write;
+  the capability also enforces this repository allowlist.
 - `ACCESS_OIDC_CLIENT_ID` — Access for SaaS OIDC client ID.
 - `ACCESS_OIDC_CLIENT_SECRET` — Access for SaaS OIDC client secret.
 - `ACCESS_OIDC_ISSUER` — Access for SaaS OIDC issuer, including the application
@@ -159,7 +163,8 @@ v1 is complete and deployed: OAuth, two-signal search, the execute sandbox,
 notebook and email capabilities on the Bureau backend, memory with ambient
 memoryContext surfacing, and canonical links. Email send is draft-first:
 `email_draft` stores the outgoing message in KV (24h) and `email_send` only
-accepts a stored draftId — there is no direct-send path. Known backlog: similarity
+accepts a stored draftId — there is no direct-send path. GitHub issue reporting
+is limited to `oflabs44/ayo` and `oflabs44/bureau`. Known backlog: similarity
 calibration from real use, Bureau reader polish, a scheduled brief-of-the-day
 routine (needs a scheduler and a notify channel), and the 2026-07-28 MCP
 envelope once hosts speak it.
