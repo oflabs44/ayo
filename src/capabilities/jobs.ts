@@ -28,7 +28,7 @@ const codeSchema = z
 	.min(1)
 	.max(20_000)
 	.describe(
-		"The same script shape as execute: a module that default-exports a function, with ayo.* capabilities in scope, no imports, and no network access.",
+		"The same script shape as execute: a module that default-exports a function, with ayo.* capabilities and a global params object in scope, no imports, and no network access. Before writing a Bureau-triggered job, use job_event_catalog to inspect params.event for its kind.",
 	);
 const scheduleSchema = z.discriminatedUnion("type", [
 	z.object({
@@ -55,12 +55,183 @@ const scheduleSchema = z.discriminatedUnion("type", [
 			),
 	}),
 ]);
+const bureauEventKinds = [
+	"mail.received",
+	"mail.sent",
+	"mail.moved",
+	"account.created",
+	"account.updated",
+	"account.deleted",
+	"event.changed",
+	"todo.changed",
+	"contact.changed",
+	"notebook.written",
+	"notebook.deleted",
+	"document.received",
+] as const;
+const bureauEventKindSet = new Set<string>(bureauEventKinds);
 const triggerSchema = z.object({
-	source: z.string().min(1),
-	kind: z.string().optional(),
+	source: z.string().min(1).describe("Webhook source name; use bureau for Bureau events."),
+	kind: z.string().optional().describe(
+		"Exact event kind. Use job_event_catalog to list Bureau kinds and inspect their payloads.",
+	),
 	// Omitted means every account the source delivers for.
-	accounts: z.array(z.string().min(1)).min(1).optional(),
+	accounts: z.array(z.string().min(1)).min(1).optional().describe(
+		"Only run for these top-level event.account values; omit to match every account.",
+	),
+}).superRefine((trigger, ctx) => {
+	if (
+		trigger.source === "bureau" &&
+		trigger.kind !== undefined &&
+		!bureauEventKindSet.has(trigger.kind)
+	) {
+		ctx.addIssue({
+			code: "custom",
+			path: ["kind"],
+			message: "Unknown Bureau event kind; use job_event_catalog to list valid kinds.",
+		});
+	}
 });
+
+type BureauEventKind = (typeof bureauEventKinds)[number];
+type BureauEventDefinition = {
+	description: string;
+	account: string;
+	data: Record<string, string | Record<string, string>>;
+};
+
+const mailData = {
+	id: "string",
+	threadId: "string",
+	messageId: "string | null",
+	uid: "number | null",
+	from: "{ address: string; name: string | null } | null",
+	to: "Array<{ address: string; name: string | null }>",
+	subject: "string | null",
+	receivedAt: "ISO 8601 timestamp",
+	r2Key: "string",
+	hasAttachments: "boolean",
+	snippet: "string | null",
+};
+const accountData = {
+	id: "account address",
+	account: {
+		address: "email address",
+		kind: '"imap"',
+		imapHost: "string",
+		smtpHost: "string",
+		davUrl: "URL",
+		enabled: "boolean",
+		pollSeconds: "integer",
+		backfillSince: '"all" | ISO 8601 timestamp | null',
+		color: "gray | brown | orange | yellow | green | blue | purple | pink | red | null",
+		label: "string | null",
+		primary: "boolean",
+	},
+};
+const calendarData = {
+	id: "string",
+	uid: "string",
+	etag: "string",
+	change: '"created" | "updated" | "deleted"',
+	calendar: "calendar id",
+	summary: "string | null",
+};
+
+const bureauEventCatalog = {
+	"mail.received": {
+		description: "A message was ingested from IMAP polling or onboarding backfill.",
+		account: "email address",
+		data: mailData,
+	},
+	"mail.sent": {
+		description: "A sent message copy was ingested.",
+		account: "email address",
+		data: mailData,
+	},
+	"mail.moved": {
+		description: "A mirrored message moved between folders.",
+		account: "email address",
+		data: {
+			id: "message id",
+			threadId: "string",
+			previousFolder: "string",
+			folder: "string",
+		},
+	},
+	"account.created": {
+		description: "A mail account was added; data.account is its initial public configuration.",
+		account: "email address",
+		data: accountData,
+	},
+	"account.updated": {
+		description: "A mail account's public configuration changed; data.account is the resulting snapshot.",
+		account: "email address",
+		data: accountData,
+	},
+	"account.deleted": {
+		description: "A mail account was removed; data.account is its last-known public configuration.",
+		account: "email address",
+		data: accountData,
+	},
+	"event.changed": {
+		description: "A calendar event was created, updated, or deleted.",
+		account: "email address",
+		data: calendarData,
+	},
+	"todo.changed": {
+		description: "A calendar todo was created, updated, or deleted.",
+		account: "email address",
+		data: calendarData,
+	},
+	"contact.changed": {
+		description: "A contact was created, updated, or deleted.",
+		account: "email address",
+		data: {
+			id: "string",
+			uid: "string | null",
+			etag: "string",
+			change: '"created" | "updated" | "deleted"',
+			addressbook: "address-book id",
+			fn: "formatted name | null",
+		},
+	},
+	"notebook.written": {
+		description: "A notebook document was created or updated.",
+		account: '"notebook"',
+		data: {
+			id: "document path",
+			path: "string",
+			version: "string",
+			title: "string",
+		},
+	},
+	"notebook.deleted": {
+		description: "A notebook document was deleted.",
+		account: '"notebook"',
+		data: { id: "document path", path: "string" },
+	},
+	"document.received": {
+		description: "A document was received by the files service.",
+		account: '"documents"',
+		data: {
+			id: "document id",
+			filename: "string",
+			mime: "MIME type",
+			title: "string (optional)",
+			correspondent: "string (optional)",
+			documentType: "invoice | contract | notice | statement | reminder | letter | other (optional)",
+			receivedOn: "ISO 8601 date (optional)",
+		},
+	},
+} as const satisfies Record<BureauEventKind, BureauEventDefinition>;
+
+const eventCatalogSchema = z.object({
+	kind: z.enum(bureauEventKinds).optional().describe(
+		"Exact Bureau event kind to inspect; omit it to list all available kinds.",
+	),
+});
+
 const expiresAtSchema = z.iso.datetime({ offset: true }).nullable();
 const createPayloadSchema = z
 	.object({
@@ -224,6 +395,55 @@ function compactJob(job: JobRow) {
 }
 
 export const jobs: Capability[] = [
+	{
+		name: "job_event_catalog",
+		description:
+			"List Bureau event kinds or inspect the exact params.event data shape before creating an event-triggered job",
+		inputSchema: eventCatalogSchema,
+		keywords: [
+			"what arguments does a Bureau event receive",
+			"inspect webhook event payload",
+			"event trigger data fields",
+			"params.event shape",
+			"account.created payload",
+		],
+		handler: (rawInput) => {
+			const { kind } = rawInput as z.infer<typeof eventCatalogSchema>;
+			if (kind === undefined) {
+				return {
+					source: "bureau",
+					paramsShape: { source: '"bureau"', event: "BureauEvent" },
+					envelope: {
+						id: "string",
+						kind: "one of kinds below",
+						account: 'email address | "notebook" | "documents"',
+						occurredAt: "ISO 8601 timestamp",
+						data: "kind-specific object",
+					},
+					kinds: bureauEventKinds.map((eventKind) => ({
+						kind: eventKind,
+						description: bureauEventCatalog[eventKind].description,
+					})),
+				};
+			}
+
+			const definition = bureauEventCatalog[kind];
+			return {
+				source: "bureau",
+				description: definition.description,
+				paramsShape: {
+					source: '"bureau"',
+					event: {
+						id: "string",
+						kind,
+						account: definition.account,
+						occurredAt: "ISO 8601 timestamp",
+						data: definition.data,
+					},
+				},
+			};
+		},
+	},
 	{
 		name: "job_create",
 		description:

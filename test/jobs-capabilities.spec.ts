@@ -41,6 +41,60 @@ afterEach(() => {
 });
 
 describe("job capabilities", () => {
+	it("lists Bureau event kinds and returns each kind's triggered-job shape", async () => {
+		const { dispatch } = createHarness();
+
+		await expect(dispatch.job_event_catalog!({})).resolves.toMatchObject({
+			source: "bureau",
+			paramsShape: { source: '"bureau"', event: "BureauEvent" },
+			kinds: expect.arrayContaining([
+				expect.objectContaining({ kind: "mail.received" }),
+				expect.objectContaining({ kind: "account.created" }),
+				expect.objectContaining({ kind: "document.received" }),
+			]),
+		});
+		await expect(
+			dispatch.job_event_catalog!({ kind: "account.created" }),
+		).resolves.toMatchObject({
+			paramsShape: {
+				source: '"bureau"',
+				event: {
+					id: "string",
+					kind: "account.created",
+					account: "email address",
+					occurredAt: "ISO 8601 timestamp",
+					data: {
+						id: "account address",
+						account: expect.objectContaining({
+							address: "email address",
+							backfillSince: expect.any(String),
+							primary: "boolean",
+						}),
+					},
+				},
+			},
+		});
+		await expect(
+			dispatch.job_event_catalog!({ kind: "mail.moved" }),
+		).resolves.toMatchObject({
+			paramsShape: {
+				event: {
+					kind: "mail.moved",
+					data: {
+						id: "message id",
+						previousFolder: "string",
+						folder: "string",
+					},
+				},
+			},
+		});
+		await expect(
+			dispatch.job_event_catalog!({ kind: "contact.changed" }),
+		).resolves.toMatchObject({
+			paramsShape: { event: { data: { uid: "string | null" } } },
+		});
+	});
+
 	it("creates with the real default expiry in one call", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
@@ -56,6 +110,17 @@ describe("job capabilities", () => {
 				runCount: 0,
 			},
 		});
+	});
+
+	it("rejects an unknown Bureau event kind", async () => {
+		const { dispatch } = createHarness();
+
+		await expect(
+			dispatch.job_create!({
+				...createInput,
+				trigger: { source: "bureau", kind: "account.create" },
+			}),
+		).rejects.toThrow("Unknown Bureau event kind");
 	});
 
 	it("creates and reads a trigger-only job", async () => {

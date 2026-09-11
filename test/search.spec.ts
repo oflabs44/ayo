@@ -144,6 +144,7 @@ describe("capability search", () => {
 					description:
 						"Schedule, inspect, run, update, and remove unattended scripts",
 					capabilities: [
+						"job_event_catalog",
 						"job_create",
 						"job_list",
 						"job_read",
@@ -190,6 +191,18 @@ describe("capability search", () => {
 				callExample: "await ayo.capabilities_list({})",
 			},
 		});
+	});
+
+	it("exposes the Bureau event catalog and its kinds through search", async () => {
+		const result = (await searchCapabilities("name:job_event_catalog", offlineEnv)) as {
+			capability: { inputSchema: unknown; callExample: string };
+		};
+		const schema = JSON.stringify(result.capability.inputSchema);
+
+		expect(result.capability.callExample).toBe("await ayo.job_event_catalog({})");
+		expect(schema).toContain("mail.received");
+		expect(schema).toContain("account.created");
+		expect(schema).toContain("document.received");
 	});
 
 	it("orders matches by weighted body and identity overlap", async () => {
@@ -304,6 +317,7 @@ describe("capability search", () => {
 					expect.stringContaining("document_tags_update\ndocuments"),
 					expect.stringContaining("document_upload\ndocuments"),
 					expect.stringContaining("document_file\ndocuments"),
+					expect.stringContaining("job_event_catalog\njobs"),
 					expect.stringContaining("job_create\njobs"),
 					expect.stringContaining("job_list\njobs"),
 					expect.stringContaining("job_read\njobs"),
@@ -565,6 +579,10 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:job_event_catalog",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:job_create",
 				namespace: "capabilities",
 			}),
@@ -594,7 +612,7 @@ describe("capability search", () => {
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 68,
+			topK: 69,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(
