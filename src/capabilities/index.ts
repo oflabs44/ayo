@@ -5,6 +5,7 @@ import { calendar } from "./calendar";
 import { contacts } from "./contacts";
 import { documents } from "./documents";
 import { email } from "./email";
+import { github } from "./github";
 import { jobs } from "./jobs";
 import { memory } from "./memory";
 import { meta } from "./meta";
@@ -69,6 +70,10 @@ export const capabilityRegistry = {
 	jobs: {
 		description: "Schedule, inspect, run, update, and remove unattended scripts",
 		capabilities: jobs,
+	},
+	github: {
+		description: "File, list, read, and comment on Ayo and Bureau GitHub issues",
+		capabilities: github,
 	},
 	ai: {
 		description: "Run a model to judge, classify, or summarize something",

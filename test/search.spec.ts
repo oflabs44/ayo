@@ -154,6 +154,17 @@ describe("capability search", () => {
 					],
 				},
 				{
+					domain: "github",
+					description:
+						"File, list, read, and comment on Ayo and Bureau GitHub issues",
+					capabilities: [
+						"github_issue_create",
+						"github_issue_list",
+						"github_issue_get",
+						"github_issue_comment",
+					],
+				},
+				{
 					domain: "ai",
 					description:
 						"Run a model to judge, classify, or summarize something",
@@ -324,6 +335,10 @@ describe("capability search", () => {
 					expect.stringContaining("job_update\njobs"),
 					expect.stringContaining("job_delete\njobs"),
 					expect.stringContaining("job_run_now\njobs"),
+					expect.stringContaining("github_issue_create\ngithub"),
+					expect.stringContaining("github_issue_list\ngithub"),
+					expect.stringContaining("github_issue_get\ngithub"),
+					expect.stringContaining("github_issue_comment\ngithub"),
 					expect.stringContaining("ai_run\nai"),
 				],
 			},
@@ -607,12 +622,28 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:github_issue_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:github_issue_list",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:github_issue_get",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:github_issue_comment",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:ai_run",
 				namespace: "capabilities",
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 69,
+			topK: 73,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(
