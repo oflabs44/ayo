@@ -10,6 +10,7 @@ const calendarTimeSchema = z.union([z.iso.date(), calendarDateTimeSchema]);
 const alarmSchema = z.object({
 	trigger: z.string().min(1),
 	action: z.enum(["DISPLAY", "EMAIL", "AUDIO"]).optional(),
+	related: z.enum(["START", "END"]).optional(),
 	description: z.string().optional(),
 });
 

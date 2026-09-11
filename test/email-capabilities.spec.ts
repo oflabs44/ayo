@@ -180,7 +180,7 @@ describe("email capabilities", () => {
 		).rejects.toThrow("Mailbox names cannot contain control characters");
 	});
 
-	it("lists the tag registry and filters threads by tag", async () => {
+	it("lists the tag registry and filters threads or messages by tag", async () => {
 		const { bureau, dispatch } = createHarness();
 
 		const tags = (await dispatch.email_tags!({})) as Array<{
@@ -195,6 +195,16 @@ describe("email capabilities", () => {
 			tag: "55555555-5555-4555-8555-555555555555",
 		});
 		expect(bureau.listThreads).toHaveBeenCalledWith({
+			address: "oladayo@example.com",
+			tag: "55555555-5555-4555-8555-555555555555",
+		});
+
+		await dispatch.email_search!({
+			kind: "messages",
+			address: "oladayo@example.com",
+			tag: "55555555-5555-4555-8555-555555555555",
+		});
+		expect(bureau.listMessages).toHaveBeenCalledWith({
 			address: "oladayo@example.com",
 			tag: "55555555-5555-4555-8555-555555555555",
 		});

@@ -95,7 +95,7 @@ describe("job capabilities", () => {
 		});
 	});
 
-	it("creates with the real default expiry in one call", async () => {
+	it("creates without an expiry when expiresAt is omitted", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(now);
 		const { dispatch } = createHarness();
@@ -105,7 +105,7 @@ describe("job capabilities", () => {
 			job: {
 				name: "Daily brief",
 				ownerProps: props,
-				expiresAt: "2026-09-19T10:00:00.000Z",
+				expiresAt: null,
 				nextRunAt: "2026-08-21T06:00:00.000Z",
 				runCount: 0,
 			},
@@ -351,6 +351,51 @@ describe("job capabilities", () => {
 			{ deleted: true },
 		);
 		await expect(dispatch.job_list!({})).resolves.toEqual({ jobs: [] });
+	});
+
+	it("reads up to the requested number of retained runs", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(now);
+		const { env, dispatch } = createHarness();
+		const created = await createStoredJob(dispatch);
+		const statements = Array.from({ length: 12 }, (_, index) =>
+			env.JOBS_DB.prepare(
+				`INSERT INTO job_runs (
+					id, job_id, started_at, finished_at, status, error,
+					duration_ms, source, event_id, result_json
+				) VALUES (?1, ?2, ?3, ?3, 'success', NULL, 1, 'manual', NULL, NULL)`,
+			).bind(
+				`run-${index}`,
+				created.job.id,
+				new Date(now + index).toISOString(),
+			),
+		);
+		await env.JOBS_DB.batch(statements);
+
+		const defaultResult = (await dispatch.job_read!({
+			id: created.job.id,
+		})) as { recentRuns: unknown[] };
+		expect(defaultResult.recentRuns).toHaveLength(10);
+
+		const expandedResult = (await dispatch.job_read!({
+			id: created.job.id,
+			limit: 12,
+		})) as { recentRuns: Array<{ id: string }> };
+		expect(expandedResult.recentRuns).toHaveLength(12);
+		expect(expandedResult.recentRuns.slice(0, 2).map((run) => run.id)).toEqual([
+			"run-11",
+			"run-10",
+		]);
+
+		await expect(
+			dispatch.job_read!({ id: created.job.id, limit: 0 }),
+		).rejects.toThrow();
+		await expect(
+			dispatch.job_read!({ id: created.job.id, limit: 51 }),
+		).rejects.toThrow();
+		await expect(
+			dispatch.job_read!({ id: created.job.id, limit: 50 }),
+		).resolves.toMatchObject({ recentRuns: expect.any(Array) });
 	});
 
 	it("runs a stored job now, records the failed sandbox outcome, and advances", async () => {

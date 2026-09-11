@@ -21,7 +21,6 @@ import {
 } from "../jobs/store";
 import type { Capability } from "./index";
 
-const DEFAULT_EXPIRY_MS = 30 * 24 * 60 * 60_000;
 const jobIdSchema = z.object({ id: z.uuid() });
 const codeSchema = z
 	.string()
@@ -246,6 +245,15 @@ const createPayloadSchema = z
 		message: "A job requires a schedule, a trigger, or both.",
 	});
 const createJobSchema = createPayloadSchema;
+const readJobSchema = jobIdSchema.extend({
+	limit: z
+		.number()
+		.int()
+		.min(1)
+		.max(50)
+		.default(10)
+		.describe("Recent run records to return; defaults to 10, maximum 50"),
+});
 const jobChangeShape = {
 	name: z.string().trim().min(1).max(80).optional(),
 	code: codeSchema.optional(),
@@ -289,7 +297,7 @@ function nextFor(
 }
 
 function newJob(
-	payload: CreatePayload & { expiresAt: string | null },
+	payload: CreatePayload,
 	props: OwnerProps,
 	now: number,
 ): JobRow {
@@ -308,7 +316,7 @@ function newJob(
 		enabled: true,
 		ownerProps: { ...props },
 		expiresAt:
-			payload.expiresAt === null
+			payload.expiresAt === undefined || payload.expiresAt === null
 				? null
 				: normalizeTimestamp(payload.expiresAt),
 		nextRunAt:
@@ -365,16 +373,6 @@ function mergeJob(job: JobRow, changes: JobChanges, now: number): JobRow {
 		expiresAt,
 		nextRunAt,
 		updatedAt: revisionAfter(job.updatedAt, now),
-	};
-}
-
-function withDefaultExpiry(payload: CreatePayload, now: number) {
-	return {
-		...payload,
-		expiresAt:
-			payload.expiresAt === undefined
-				? new Date(now + DEFAULT_EXPIRY_MS).toISOString()
-				: payload.expiresAt,
 	};
 }
 
@@ -461,11 +459,11 @@ export const jobs: Capability[] = [
 		],
 		handler: async (rawInput, { env, props }) => {
 			const now = Date.now();
-			const payload = withDefaultExpiry(
+			const job = newJob(
 				rawInput as z.infer<typeof createJobSchema>,
+				props,
 				now,
 			);
-			const job = newJob(payload, props, now);
 			await createJob(env, job);
 			return { created: true, job };
 		},
@@ -487,19 +485,20 @@ export const jobs: Capability[] = [
 	{
 		name: "job_read",
 		description:
-			"Read one unattended job in full, including its script, owner properties, schedule or event trigger, expiry, run counters, and ten most recent run records",
-		inputSchema: jobIdSchema,
+			"Read one unattended job in full, including its script, owner properties, schedule or event trigger, expiry, run counters, and up to 50 recent run records",
+		inputSchema: readJobSchema,
 		keywords: [
 			"inspect scheduled job",
 			"show job code",
 			"why did this job fail",
+			"job run history",
 			"job run statistics",
 		],
 		handler: async (rawInput, { env }) => {
-			const { id } = rawInput as z.infer<typeof jobIdSchema>;
+			const { id, limit } = rawInput as z.infer<typeof readJobSchema>;
 			const job = await getJob(env, id);
 			if (!job) throw noJob(id);
-			return { ...job, recentRuns: await listJobRuns(env, id, 10) };
+			return { ...job, recentRuns: await listJobRuns(env, id, limit) };
 		},
 	},
 	{

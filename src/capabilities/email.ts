@@ -26,6 +26,7 @@ const searchInputSchema = z.discriminatedUnion("kind", [
 		kind: z.literal("messages"),
 		folder: z.string().min(1).optional(),
 		threadId: z.string().min(1).optional(),
+		tag: z.uuid().optional(),
 		...paginationFields,
 	}),
 ]);
@@ -246,13 +247,14 @@ export const email: Capability[] = [
 	{
 		name: "email_search",
 		description:
-			"Find email threads or messages in an account; use accounts_list to find valid addresses, email_mailboxes for folder names, and email_tags to filter threads by tag",
+			"Find email threads or messages in an account; use accounts_list to find valid addresses, email_mailboxes for folder names, and email_tags to filter by tag",
 		inputSchema: searchInputSchema,
 		keywords: [
 			"search email",
 			"find mail",
 			"list inbox threads",
 			"starred email",
+			"messages with a tag",
 			"recent messages",
 		],
 		handler: async (input, { env }) => {

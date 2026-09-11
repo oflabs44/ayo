@@ -68,10 +68,55 @@ describe("tasks capabilities", () => {
 		expect(bureau.createTodo).toHaveBeenCalledWith(input);
 	});
 
+	it("creates, updates, and clears recurrence rules", async () => {
+		const { bureau, dispatch } = createHarness();
+		const rrule = "FREQ=DAILY";
+		const start = "2026-08-26T18:00:00+02:00";
+
+		await dispatch.task_create!({
+			address,
+			calendar: calendarId,
+			summary: "Drink water",
+			start,
+			rrule,
+		});
+		expect(bureau.createTodo).toHaveBeenCalledWith(
+			expect.objectContaining({ start, rrule }),
+		);
+
+		await dispatch.task_update!({ address, id: taskId, rrule });
+		expect(bureau.updateTodo).toHaveBeenCalledWith({
+			address,
+			id: taskId,
+			rrule,
+		});
+
+		await dispatch.task_update!({ address, id: taskId, rrule: null });
+		expect(bureau.updateTodo).toHaveBeenCalledWith({
+			address,
+			id: taskId,
+			rrule: null,
+		});
+
+		await expect(
+			dispatch.task_create!({
+				address,
+				calendar: calendarId,
+				summary: "No recurrence anchor",
+				rrule,
+			}),
+		).rejects.toThrow("Recurring tasks require a start");
+	});
+
 	it("carries reminder alarms on create and alarm-only updates and clearing", async () => {
 		const { bureau, dispatch } = createHarness();
 		const alarms = [
-			{ trigger: "-PT15M", action: "DISPLAY" as const, description: "Soon" },
+			{
+				trigger: "-PT15M",
+				action: "DISPLAY" as const,
+				related: "END" as const,
+				description: "Soon",
+			},
 		];
 
 		await dispatch.task_create!({
