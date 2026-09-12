@@ -43,6 +43,29 @@ describe("tasks capabilities", () => {
 		expect(bureau.listTodos).toHaveBeenCalledWith(input);
 	});
 
+	it("keeps status and completion time in unfiltered task rows", async () => {
+		const { bureau, dispatch } = createHarness();
+		const completedTask = {
+			id: taskId,
+			calendar: calendarId,
+			uid: "completed-task",
+			summary: "Submit report",
+			status: "COMPLETED",
+			start: "2026-09-08",
+			due: "2026-09-08",
+			completed: "2026-09-08T18:00:00.000Z",
+			priority: 0,
+			alarms: [],
+			etag: '"task-v2"',
+		};
+		vi.mocked(bureau.listTodos).mockResolvedValueOnce([completedTask]);
+
+		const result = await dispatch.task_list!({ address });
+
+		expect(bureau.listTodos).toHaveBeenCalledWith({ address });
+		expect(result).toEqual([completedTask]);
+	});
+
 	it("reads one task with the exact Bureau RPC shape", async () => {
 		const { bureau, dispatch } = createHarness();
 
@@ -61,6 +84,22 @@ describe("tasks capabilities", () => {
 			description: "Milk and bread",
 			priority: 3,
 			status: "NEEDS-ACTION",
+		};
+
+		await dispatch.task_create!(input);
+
+		expect(bureau.createTodo).toHaveBeenCalledWith(input);
+	});
+
+	it("allows equal start and due dates for same-day tasks", async () => {
+		const { bureau, dispatch } = createHarness();
+		const input = {
+			address,
+			calendar: calendarId,
+			summary: "One-day task",
+			start: "2026-09-08",
+			due: "2026-09-08",
+			rrule: "FREQ=DAILY",
 		};
 
 		await dispatch.task_create!(input);

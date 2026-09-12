@@ -90,7 +90,7 @@ export const tasks: Capability[] = [
 	{
 		name: "task_list",
 		description:
-			"Find overdue tasks or tasks due before a date, optionally filtered by calendar or status",
+			"List tasks with each row's status and completed timestamp, optionally filtered by calendar, status, or due before a date; without a status filter, all statuses are returned",
 		inputSchema: listTasksSchema,
 		keywords: [
 			"list tasks",
@@ -98,6 +98,7 @@ export const tasks: Capability[] = [
 			"overdue tasks",
 			"what is on my plate",
 			"open todos",
+			"completed tasks",
 		],
 		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
