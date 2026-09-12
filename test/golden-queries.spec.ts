@@ -126,6 +126,7 @@ const goldenQueries = [
 	["what tasks are due this week", "task_list"],
 	["what is on my plate", "task_list"],
 	["show my overdue tasks", "task_list"],
+	["show my completed tasks", "task_list"],
 	["open this task and show its details", "task_read"],
 	["read this to-do item", "task_read"],
 	["add a task to buy groceries", "task_create"],
