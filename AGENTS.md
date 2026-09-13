@@ -27,8 +27,10 @@ against those capabilities, instead of one MCP tool per capability.
 - `src/mcp.ts` — MCP server, transport, conversationId/memoryContext relay
 - `src/oauth/` — Cloudflare Access OIDC login flow, consent gate, and the
   `/notebook/*` canonical-link redirect
-- `src/capabilities/` — the registry: one file per domain (`meta`, `notebook`,
-  `documents`, `memory`, `email`, `github`), keyed and flattened in `index.ts`
+- `src/capabilities/` — the registry: one file per domain, keyed and flattened
+  in `index.ts`. `capabilityRegistry` there is the source of truth for domains
+  and capabilities; read it (or call `capabilities_list`) instead of listing
+  them in docs
 - `src/search.ts` — search modes, lexical scoring, embeddings, RRF fusion
 - `src/execute.ts` — codemode sandbox and the `ayo.*` dispatch table
 - `src/notebook/` — `NotebookStore` contract, in-memory reference store,
@@ -160,7 +162,7 @@ Every new capability must ship with:
 ## Status
 
 v1 is complete and deployed: OAuth, two-signal search, the execute sandbox,
-notebook and email capabilities on the Bureau backend, memory with ambient
+the capability domains in `capabilityRegistry`, memory with ambient
 memoryContext surfacing, and canonical links. Email send is draft-first:
 `email_draft` stores the outgoing message in KV (24h) and `email_send` only
 accepts a stored draftId — there is no direct-send path. GitHub issue reporting
