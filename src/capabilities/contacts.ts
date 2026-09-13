@@ -15,6 +15,13 @@ const contactValueSchema = z.object({
 	type: z.string().optional(),
 	pref: z.boolean().optional(),
 });
+const contactNameSchema = z.object({
+	family: z.string(),
+	given: z.string(),
+	additional: z.string().default(""),
+	prefix: z.string().default(""),
+	suffix: z.string().default(""),
+});
 const contactAddressSchema = z.object({
 	street: z.string(),
 	city: z.string(),
@@ -23,19 +30,11 @@ const contactAddressSchema = z.object({
 	country: z.string(),
 	type: z.string().optional(),
 });
-// Photos are deliberately excluded, and updates stay in Bureau's UI.
+// Photos are deliberately excluded from contact writes.
 const contactWriteSchema = accountSchema.extend({
 	addressbook: z.uuid(),
 	fn: z.string().min(1),
-	n: z
-		.object({
-			family: z.string(),
-			given: z.string(),
-			additional: z.string().default(""),
-			prefix: z.string().default(""),
-			suffix: z.string().default(""),
-		})
-		.optional(),
+	n: contactNameSchema.optional(),
 	nickname: z.string().optional(),
 	org: z.string().optional(),
 	title: z.string().optional(),
@@ -51,9 +50,47 @@ const contactWriteSchema = accountSchema.extend({
 const createContactSchema = contactWriteSchema.extend({
 	force: z.boolean().optional(),
 });
+const contactUpdateBodySchema = z
+	.object({
+		fn: z.string().min(1).optional(),
+		n: contactNameSchema.nullable().optional(),
+		nickname: z.string().nullable().optional(),
+		org: z.string().nullable().optional(),
+		title: z.string().nullable().optional(),
+		emails: z.array(contactValueSchema).nullable().optional(),
+		tels: z.array(contactValueSchema).nullable().optional(),
+		urls: z.array(contactValueSchema).nullable().optional(),
+		adrs: z.array(contactAddressSchema).nullable().optional(),
+		bday: z.string().nullable().optional(),
+		anniversary: z.string().nullable().optional(),
+		note: z.string().nullable().optional(),
+		categories: z.array(z.string()).nullable().optional(),
+	})
+	.refine(
+		(input) =>
+			input.fn !== undefined ||
+			input.n !== undefined ||
+			input.nickname !== undefined ||
+			input.org !== undefined ||
+			input.title !== undefined ||
+			input.emails !== undefined ||
+			input.tels !== undefined ||
+			input.urls !== undefined ||
+			input.adrs !== undefined ||
+			input.bday !== undefined ||
+			input.anniversary !== undefined ||
+			input.note !== undefined ||
+			input.categories !== undefined,
+		{ message: "At least one contact field is required" },
+	);
+const updateContactSchema = contactUpdateBodySchema.safeExtend({
+	...resourceSchema.shape,
+	etag: z.string().min(1).optional(),
+});
 const deleteContactSchema = resourceSchema;
 
 type ContactWrite = z.infer<typeof contactWriteSchema>;
+type ContactUpdate = z.infer<typeof updateContactSchema>;
 
 function unavailable() {
 	return { error: BACKEND_NOT_CONFIGURED };
@@ -62,13 +99,26 @@ function unavailable() {
 function compactCard(contact: {
 	id: string;
 	fn: string | null;
-	emails: Array<Record<string, unknown>>;
+	emails: Array<{ value: string }>;
 }) {
 	return {
 		id: contact.id,
 		fn: contact.fn,
 		emails: contact.emails.map((entry) => entry.value),
 	};
+}
+
+function mergeContactField<T>(
+	patch: T | null | undefined,
+	current: T | null,
+): T | undefined {
+	return (patch === undefined ? current : patch) ?? undefined;
+}
+
+function omitUndefined<T extends Record<string, unknown>>(input: T): T {
+	return Object.fromEntries(
+		Object.entries(input).filter(([, value]) => value !== undefined),
+	) as T;
 }
 
 async function findLikelyDuplicates(
@@ -102,9 +152,27 @@ async function findLikelyDuplicates(
 
 export const contacts: Capability[] = [
 	{
+		name: "contact_addressbooks",
+		description:
+			"Find which address books are available in an email account and get their UUIDs and display names",
+		inputSchema: accountSchema,
+		keywords: [
+			"list address books",
+			"list my address books",
+			"available address books",
+			"choose an address book",
+		],
+		handler: async (input, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			return env.BUREAU.listAddressBooks(
+				input as z.infer<typeof accountSchema>,
+			);
+		},
+	},
+	{
 		name: "contact_find",
 		description:
-			"Look up a person in the address book by name or email substring to get their email address or phone number",
+			"Look up a person by name or email substring to get their email address or phone number; contact_addressbooks lists available address book UUIDs",
 		inputSchema: findContactsSchema,
 		keywords: [
 			"find a contact",
@@ -143,7 +211,7 @@ export const contacts: Capability[] = [
 	{
 		name: "contact_create",
 		description:
-			"Save a new person to the address book. Likely duplicates are refused unless force: true marks this as a genuinely different person",
+			"Save a new person to the address book. Likely duplicates are refused unless force: true marks this as a genuinely different person; contact_addressbooks lists available address book UUIDs",
 		inputSchema: createContactSchema,
 		keywords: [
 			"add a contact",
@@ -163,12 +231,68 @@ export const contacts: Capability[] = [
 						created: false,
 						matches: duplicates,
 						error:
-							"A likely matching contact exists. Contacts are managed in Bureau - update the existing card there, or pass force: true for a genuinely different person.",
+							"A likely matching contact exists. Use contact_update on the existing card, or pass force: true for a genuinely different person.",
 					};
 				}
 			}
 			const created = await env.BUREAU.createContact(write);
 			return { created: true, contact: compactCard(created) };
+		},
+	},
+	{
+		name: "contact_update",
+		description:
+			"Update someone's contact details, such as their name, job title, phone numbers, email addresses, organisation, address, dates, notes, or categories; any field except fn can be null to clear it, and an ETag from contact_read can make the update safe",
+		inputSchema: updateContactSchema,
+		keywords: [
+			"update contact",
+			"edit contact",
+			"update someone's details",
+			"change job title",
+			"change phone number",
+			"change email address",
+		],
+		handler: async (rawInput, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			const input = rawInput as ContactUpdate;
+			const current = await env.BUREAU.getContact({
+				address: input.address,
+				id: input.id,
+			});
+			const fn = input.fn ?? current.fn;
+			if (fn === null) {
+				throw new Error(
+					"This contact has no formatted name; provide fn to update it",
+				);
+			}
+
+			return env.BUREAU.updateContact(
+				omitUndefined({
+					address: input.address,
+					id: input.id,
+					etag: input.etag ?? current.etag,
+					addressbook: current.addressbook,
+					fn,
+					n: mergeContactField(input.n, current.n),
+					nickname: mergeContactField(input.nickname, current.nickname),
+					org: mergeContactField(input.org, current.org),
+					title: mergeContactField(input.title, current.title),
+					emails: mergeContactField(input.emails, current.emails),
+					tels: mergeContactField(input.tels, current.tels),
+					urls: mergeContactField(input.urls, current.urls),
+					adrs: mergeContactField(input.adrs, current.adrs),
+					bday: mergeContactField(input.bday, current.bday),
+					anniversary: mergeContactField(
+						input.anniversary,
+						current.anniversary,
+					),
+					note: mergeContactField(input.note, current.note),
+					categories: mergeContactField(
+						input.categories,
+						current.categories,
+					),
+				}),
+			);
 		},
 	},
 	{
