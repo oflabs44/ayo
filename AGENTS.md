@@ -77,6 +77,12 @@ against those capabilities, instead of one MCP tool per capability.
   `pnpm exec wrangler secret put GITHUB_TOKEN`. Use a fine-grained PAT limited
   to exactly `oflabs44/ayo` and `oflabs44/bureau`, with Issues read-and-write;
   the capability also enforces this repository allowlist.
+- `MIGADU_USER` and `MIGADU_API_KEY` — Worker secrets for Migadu email hosting
+  admin (HTTP Basic auth: `MIGADU_USER` is the Migadu account email,
+  `MIGADU_API_KEY` the API key). Set them with
+  `pnpm exec wrangler secret put MIGADU_USER` and
+  `pnpm exec wrangler secret put MIGADU_API_KEY`. The key has full account
+  admin rights.
 - `ACCESS_OIDC_CLIENT_ID` — Access for SaaS OIDC client ID.
 - `ACCESS_OIDC_CLIENT_SECRET` — Access for SaaS OIDC client secret.
 - `ACCESS_OIDC_ISSUER` — Access for SaaS OIDC issuer, including the application

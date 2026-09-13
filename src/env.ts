@@ -494,6 +494,10 @@ export type Env = {
 	GITHUB_TOKEN?: string;
 	JOBS_DB: D1Database;
 	LOADER?: WorkerLoader;
+	/** Test-only seam for direct Migadu REST calls. */
+	MIGADU_FETCH_FOR_TESTS?: typeof fetch;
+	MIGADU_API_KEY?: string;
+	MIGADU_USER?: string;
 	NOTEBOOK_STORE_FOR_TESTS?: NotebookStore;
 	OAUTH_KV: KVNamespace;
 	OAUTH_PROVIDER: OAuthHelpers;

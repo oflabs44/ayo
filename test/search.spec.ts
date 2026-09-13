@@ -165,6 +165,23 @@ describe("capability search", () => {
 					],
 				},
 				{
+					domain: "migadu",
+					description:
+						"Administer Migadu email hosting: onboard custom domains and create addresses and aliases",
+					capabilities: [
+						"migadu_domains",
+						"migadu_domain_create",
+						"migadu_domain_records",
+						"migadu_domain_diagnostics",
+						"migadu_domain_activate",
+						"migadu_mailboxes",
+						"migadu_mailbox_create",
+						"migadu_aliases",
+						"migadu_alias_create",
+						"migadu_alias_delete",
+					],
+				},
+				{
 					domain: "ai",
 					description:
 						"Run a model to judge, classify, or summarize something",
@@ -339,6 +356,16 @@ describe("capability search", () => {
 					expect.stringContaining("github_issue_list\ngithub"),
 					expect.stringContaining("github_issue_get\ngithub"),
 					expect.stringContaining("github_issue_comment\ngithub"),
+					expect.stringContaining("migadu_domains\nmigadu"),
+					expect.stringContaining("migadu_domain_create\nmigadu"),
+					expect.stringContaining("migadu_domain_records\nmigadu"),
+					expect.stringContaining("migadu_domain_diagnostics\nmigadu"),
+					expect.stringContaining("migadu_domain_activate\nmigadu"),
+					expect.stringContaining("migadu_mailboxes\nmigadu"),
+					expect.stringContaining("migadu_mailbox_create\nmigadu"),
+					expect.stringContaining("migadu_aliases\nmigadu"),
+					expect.stringContaining("migadu_alias_create\nmigadu"),
+					expect.stringContaining("migadu_alias_delete\nmigadu"),
 					expect.stringContaining("ai_run\nai"),
 				],
 			},
@@ -638,12 +665,52 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:migadu_domains",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:migadu_domain_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:migadu_domain_records",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:migadu_domain_diagnostics",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:migadu_domain_activate",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:migadu_mailboxes",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:migadu_mailbox_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:migadu_aliases",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:migadu_alias_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:migadu_alias_delete",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:ai_run",
 				namespace: "capabilities",
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 73,
+			topK: 83,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(
