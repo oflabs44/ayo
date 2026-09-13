@@ -61,9 +61,15 @@ const bureauEventKinds = [
 	"account.created",
 	"account.updated",
 	"account.deleted",
-	"event.changed",
-	"todo.changed",
-	"contact.changed",
+	"event.created",
+	"event.updated",
+	"event.deleted",
+	"todo.created",
+	"todo.updated",
+	"todo.deleted",
+	"contact.created",
+	"contact.updated",
+	"contact.deleted",
 	"notebook.written",
 	"notebook.deleted",
 	"document.received",
@@ -132,9 +138,15 @@ const calendarData = {
 	id: "string",
 	uid: "string",
 	etag: "string",
-	change: '"created" | "updated" | "deleted"',
 	calendar: "calendar id",
 	summary: "string | null",
+};
+const contactData = {
+	id: "string",
+	uid: "string | null",
+	etag: "string",
+	addressbook: "address-book id",
+	fn: "formatted name | null",
 };
 
 const bureauEventCatalog = {
@@ -173,27 +185,50 @@ const bureauEventCatalog = {
 		account: "email address",
 		data: accountData,
 	},
-	"event.changed": {
-		description: "A calendar event was created, updated, or deleted.",
+	"event.created": {
+		description: "A calendar event was created.",
 		account: "email address",
 		data: calendarData,
 	},
-	"todo.changed": {
-		description: "A calendar todo was created, updated, or deleted.",
+	"event.updated": {
+		description: "A calendar event was updated.",
 		account: "email address",
 		data: calendarData,
 	},
-	"contact.changed": {
-		description: "A contact was created, updated, or deleted.",
+	"event.deleted": {
+		description: "A calendar event was deleted.",
 		account: "email address",
-		data: {
-			id: "string",
-			uid: "string | null",
-			etag: "string",
-			change: '"created" | "updated" | "deleted"',
-			addressbook: "address-book id",
-			fn: "formatted name | null",
-		},
+		data: calendarData,
+	},
+	"todo.created": {
+		description: "A calendar todo was created.",
+		account: "email address",
+		data: calendarData,
+	},
+	"todo.updated": {
+		description: "A calendar todo was updated.",
+		account: "email address",
+		data: calendarData,
+	},
+	"todo.deleted": {
+		description: "A calendar todo was deleted.",
+		account: "email address",
+		data: calendarData,
+	},
+	"contact.created": {
+		description: "A contact was created.",
+		account: "email address",
+		data: contactData,
+	},
+	"contact.updated": {
+		description: "A contact was updated.",
+		account: "email address",
+		data: contactData,
+	},
+	"contact.deleted": {
+		description: "A contact was deleted.",
+		account: "email address",
+		data: contactData,
 	},
 	"notebook.written": {
 		description: "A notebook document was created or updated.",
