@@ -57,6 +57,15 @@ type BureauCalendar = {
 	color: string | null;
 	updatedAt: string;
 };
+type BureauAddressBook = {
+	id: string;
+	account: string;
+	kind: "addressbook";
+	url: string;
+	displayName: string | null;
+	color: string | null;
+	updatedAt: string;
+};
 type BureauCalendarEvent = {
 	id: string;
 	calendar: string;
@@ -106,19 +115,70 @@ type BureauTag = {
 	color: string | null;
 	createdAt: string;
 };
+type BureauContactValue = {
+	value: string;
+	type?: string;
+	pref?: boolean;
+};
+type BureauContactName = {
+	family: string;
+	given: string;
+	additional: string;
+	prefix: string;
+	suffix: string;
+};
+type BureauContactAddress = {
+	street: string;
+	city: string;
+	region: string;
+	postal: string;
+	country: string;
+	type?: string;
+};
+type BureauContactPhoto = { contentType: string; base64: string };
 type BureauContact = {
 	id: string;
 	addressbook: string;
+	uid: string | null;
 	fn: string | null;
-	emails: Array<Record<string, unknown>>;
-	tels: Array<Record<string, unknown>>;
+	n: BureauContactName | null;
+	nickname: string | null;
+	org: string | null;
+	title: string | null;
+	emails: BureauContactValue[];
+	tels: BureauContactValue[];
+	urls: BureauContactValue[];
+	adrs: BureauContactAddress[];
+	bday: string | null;
+	anniversary: string | null;
+	note: string | null;
+	categories: string[];
+	hasPhoto: boolean;
 	etag: string;
-} & Record<string, unknown>;
+};
 type BureauContactWrite = {
 	address: string;
 	addressbook: string;
 	fn: string;
-} & Record<string, unknown>;
+	n?: BureauContactName;
+	nickname?: string;
+	org?: string;
+	title?: string;
+	emails?: BureauContactValue[];
+	tels?: BureauContactValue[];
+	urls?: BureauContactValue[];
+	adrs?: BureauContactAddress[];
+	bday?: string;
+	anniversary?: string;
+	note?: string;
+	categories?: string[];
+	photo?: BureauContactPhoto;
+};
+type BureauContactUpdate = Omit<BureauContactWrite, "photo"> & {
+	id: string;
+	etag: string;
+	photo?: BureauContactPhoto | null;
+};
 type BureauAlarmRead = {
 	trigger: string;
 	action?: string;
@@ -293,6 +353,7 @@ export type BureauBinding = {
 		id: string;
 		etag?: string;
 	}): Promise<{ id: string }>;
+	listAddressBooks(input: { address: string }): Promise<BureauAddressBook[]>;
 	listContacts(input: {
 		address: string;
 		q?: string;
@@ -303,6 +364,7 @@ export type BureauBinding = {
 		id: string;
 	}): Promise<BureauContact & { raw: string }>;
 	createContact(input: BureauContactWrite): Promise<BureauContact>;
+	updateContact(input: BureauContactUpdate): Promise<BureauContact>;
 	removeContact(input: {
 		address: string;
 		id: string;
