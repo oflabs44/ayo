@@ -9,6 +9,7 @@ import { github } from "./github";
 import { jobs } from "./jobs";
 import { memory } from "./memory";
 import { meta } from "./meta";
+import { migadu } from "./migadu";
 import { notebook } from "./notebook";
 import { tasks } from "./tasks";
 
@@ -74,6 +75,11 @@ export const capabilityRegistry = {
 	github: {
 		description: "File, list, read, and comment on Ayo and Bureau GitHub issues",
 		capabilities: github,
+	},
+	migadu: {
+		description:
+			"Administer Migadu email hosting: onboard custom domains and create addresses and aliases",
+		capabilities: migadu,
 	},
 	ai: {
 		description: "Run a model to judge, classify, or summarize something",
