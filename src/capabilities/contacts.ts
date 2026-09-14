@@ -9,6 +9,7 @@ const resourceSchema = accountSchema.extend({ id: z.uuid() });
 const findContactsSchema = accountSchema.extend({
 	q: z.string().min(1).optional(),
 	addressbook: z.uuid().optional(),
+	categories: z.array(z.string().trim().min(1)).min(1).optional(),
 });
 const contactValueSchema = z.object({
 	value: z.string().min(1),
@@ -88,6 +89,30 @@ const updateContactSchema = contactUpdateBodySchema.safeExtend({
 	etag: z.string().min(1).optional(),
 });
 const deleteContactSchema = resourceSchema;
+const listContactGroupsSchema = accountSchema.extend({
+	addressbook: z.uuid().optional(),
+});
+const createContactGroupSchema = accountSchema.extend({
+	addressbook: z.uuid(),
+	name: z.string().min(1),
+	members: z.array(z.uuid()).optional(),
+});
+const updateContactGroupSchema = resourceSchema
+	.extend({
+		etag: z.string().min(1).optional(),
+		name: z.string().min(1).optional(),
+		addMembers: z.array(z.uuid()).optional(),
+		removeMembers: z.array(z.uuid()).optional(),
+		removeMemberUids: z.array(z.string().min(1)).optional(),
+	})
+	.refine(
+		(input) =>
+			input.name !== undefined ||
+			input.addMembers !== undefined ||
+			input.removeMembers !== undefined ||
+			input.removeMemberUids !== undefined,
+		{ message: "At least one group change is required" },
+	);
 
 type ContactWrite = z.infer<typeof contactWriteSchema>;
 type ContactUpdate = z.infer<typeof updateContactSchema>;
@@ -172,7 +197,7 @@ export const contacts: Capability[] = [
 	{
 		name: "contact_find",
 		description:
-			"Look up a person by name or email substring to get their email address or phone number; contact_addressbooks lists available address book UUIDs",
+			"Look up a person by name or email substring, or everyone with given categories, to get their email address or phone number; contact groups are not included, and contact_addressbooks lists available address book UUIDs",
 		inputSchema: findContactsSchema,
 		keywords: [
 			"find a contact",
@@ -180,6 +205,7 @@ export const contacts: Capability[] = [
 			"what is their email address",
 			"phone number for",
 			"address book",
+			"contacts with a category",
 		],
 		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
@@ -312,6 +338,103 @@ export const contacts: Capability[] = [
 				...input,
 				etag: card.etag,
 			});
+			return { deleted: true, id: removed.id };
+		},
+	},
+	{
+		name: "contact_group_list",
+		description:
+			"List my contact groups, such as family or a team, with their member counts",
+		inputSchema: listContactGroupsSchema,
+		keywords: [
+			"list contact groups",
+			"which contact groups exist",
+			"my contact groups",
+			"distribution lists",
+			"groups of people",
+		],
+		handler: async (input, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			return env.BUREAU.listContactGroups(
+				input as z.infer<typeof listContactGroupsSchema>,
+			);
+		},
+	},
+	{
+		name: "contact_group_read",
+		description:
+			"See who is in a contact group; members that no longer exist are listed as unresolved UIDs",
+		inputSchema: resourceSchema,
+		keywords: [
+			"who is in this group",
+			"members of a contact group",
+			"list group members",
+			"open contact group",
+		],
+		handler: async (input, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			return env.BUREAU.getContactGroup(
+				input as z.infer<typeof resourceSchema>,
+			);
+		},
+	},
+	{
+		name: "contact_group_create",
+		description:
+			"Create a contact group, such as family or a project team, optionally with contacts from the same address book as members",
+		inputSchema: createContactGroupSchema,
+		keywords: [
+			"create contact group",
+			"new group of contacts",
+			"make a distribution list",
+		],
+		handler: async (input, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			return env.BUREAU.createContactGroup(
+				input as z.infer<typeof createContactGroupSchema>,
+			);
+		},
+	},
+	{
+		name: "contact_group_update",
+		description:
+			"Rename a contact group or add and remove its members; removeMemberUids drops members that no longer exist, and an ETag from contact_group_read can make the update safe",
+		inputSchema: updateContactGroupSchema,
+		keywords: [
+			"add someone to a group",
+			"remove someone from a group",
+			"rename contact group",
+			"change group members",
+		],
+		handler: async (rawInput, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			const input = rawInput as z.infer<typeof updateContactGroupSchema>;
+			const etag =
+				input.etag ??
+				(
+					await env.BUREAU.getContactGroup({
+						address: input.address,
+						id: input.id,
+					})
+				).etag;
+			return env.BUREAU.updateContactGroup({ ...input, etag });
+		},
+	},
+	{
+		name: "contact_group_delete",
+		description:
+			"Delete a contact group without deleting the people in it",
+		inputSchema: deleteContactSchema,
+		keywords: [
+			"delete contact group",
+			"remove a group",
+			"drop distribution list",
+		],
+		handler: async (rawInput, { env }) => {
+			if (!env.BUREAU) return unavailable();
+			const removed = await env.BUREAU.removeContactGroup(
+				rawInput as z.infer<typeof deleteContactSchema>,
+			);
 			return { deleted: true, id: removed.id };
 		},
 	},

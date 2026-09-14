@@ -6,6 +6,7 @@ import { buildDispatchTable } from "../src/execute";
 const address = "oladayo@example.com";
 const contactId = "33333333-3333-4333-8333-333333333333";
 const addressbook = "44444444-4444-4444-8444-444444444444";
+const groupId = "55555555-5555-4555-8555-555555555555";
 const props: OwnerProps = {
 	email: address,
 	name: "Oladayo",
@@ -59,6 +60,19 @@ function createHarness() {
 		createContact: vi.fn(async () => contact),
 		updateContact: vi.fn(async () => contact),
 		removeContact: vi.fn(async () => ({ id: contactId })),
+		listContactGroups: vi.fn(async () => []),
+		getContactGroup: vi.fn(async () => ({
+			id: groupId,
+			addressbook,
+			uid: "group-uid",
+			name: "Family",
+			etag: '"group-v1"',
+			members: [],
+			unresolvedMemberUids: [],
+		})),
+		createContactGroup: vi.fn(async () => ({ id: groupId })),
+		updateContactGroup: vi.fn(async () => ({ id: groupId })),
+		removeContactGroup: vi.fn(async () => ({ id: groupId })),
 	} as unknown as BureauBinding;
 	const env = { BUREAU: bureau } as unknown as Env;
 
@@ -88,7 +102,7 @@ describe("contact capabilities", () => {
 
 	it("finds contacts with the exact Bureau RPC shape", async () => {
 		const { bureau, dispatch } = createHarness();
-		const input = { address, q: "timi", addressbook };
+		const input = { address, q: "timi", addressbook, categories: ["family"] };
 
 		await dispatch.contact_find!(input);
 
@@ -273,5 +287,62 @@ describe("contact capabilities", () => {
 		await expect(dispatch.contact_find!({ address })).rejects.toThrow(
 			"Unknown account",
 		);
+	});
+
+	it("creates, lists, and deletes contact groups with the exact Bureau RPC shapes", async () => {
+		const { bureau, dispatch } = createHarness();
+		const create = { address, addressbook, name: "Family", members: [contactId] };
+
+		await dispatch.contact_group_create!(create);
+		await dispatch.contact_group_list!({ address, addressbook });
+		await expect(
+			dispatch.contact_group_delete!({ address, id: groupId }),
+		).resolves.toEqual({ deleted: true, id: groupId });
+
+		expect(bureau.createContactGroup).toHaveBeenCalledWith(create);
+		expect(bureau.listContactGroups).toHaveBeenCalledWith({ address, addressbook });
+		expect(bureau.removeContactGroup).toHaveBeenCalledWith({ address, id: groupId });
+	});
+
+	it("updates a group with the current ETag when none is supplied", async () => {
+		const { bureau, dispatch } = createHarness();
+
+		await dispatch.contact_group_update!({
+			address,
+			id: groupId,
+			addMembers: [contactId],
+			removeMemberUids: ["urn:uuid:gone"],
+		});
+		await dispatch.contact_group_update!({
+			address,
+			id: groupId,
+			etag: '"caller-etag"',
+			name: "Close family",
+		});
+
+		expect(bureau.getContactGroup).toHaveBeenCalledTimes(1);
+		expect(bureau.updateContactGroup).toHaveBeenNthCalledWith(1, {
+			address,
+			id: groupId,
+			etag: '"group-v1"',
+			addMembers: [contactId],
+			removeMemberUids: ["urn:uuid:gone"],
+		});
+		expect(bureau.updateContactGroup).toHaveBeenNthCalledWith(2, {
+			address,
+			id: groupId,
+			etag: '"caller-etag"',
+			name: "Close family",
+		});
+	});
+
+	it("rejects a group update without a change", async () => {
+		const { bureau, dispatch } = createHarness();
+
+		await expect(
+			dispatch.contact_group_update!({ address, id: groupId }),
+		).rejects.toThrow("At least one group change is required");
+		expect(bureau.getContactGroup).not.toHaveBeenCalled();
+		expect(bureau.updateContactGroup).not.toHaveBeenCalled();
 	});
 });
