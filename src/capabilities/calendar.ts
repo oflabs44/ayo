@@ -29,14 +29,23 @@ const eventWriteSchema = z
 		alarms: z.array(alarmSchema).optional(),
 	})
 	.superRefine((input, context) => {
-		if ((input.end === undefined) === (input.duration === undefined)) {
+		const startIsDate = input.start.length === 10;
+		const hasEnd = input.end !== undefined;
+		const hasDuration = input.duration !== undefined;
+		if (hasEnd && hasDuration) {
 			context.addIssue({
 				code: "custom",
-				message: "Exactly one of end or duration is required",
+				message: "Pass end or duration, not both",
+			});
+		}
+		if (!hasEnd && !hasDuration && !startIsDate) {
+			context.addIssue({
+				code: "custom",
+				message:
+					"A timed event needs end or duration; only all-day events default to one day",
 			});
 		}
 
-		const startIsDate = input.start.length === 10;
 		const allDay = input.allDay ?? startIsDate;
 		const endHasWrongFormat = input.end
 			? allDay !== (input.end.length === 10)
@@ -77,6 +86,20 @@ const deleteEventSchema = resourceSchema.extend({
 
 function unavailable() {
 	return { error: BACKEND_NOT_CONFIGURED };
+}
+
+// Bureau requires end or duration; a date-only start with neither is a single all-day event.
+function defaultAllDayDuration<T extends { start: string; end?: string; duration?: string }>(
+	input: T,
+): T {
+	if (
+		input.start.length === 10 &&
+		input.end === undefined &&
+		input.duration === undefined
+	) {
+		return { ...input, duration: "P1D" };
+	}
+	return input;
 }
 
 function compareCalendarTimes(left: string, right: string): number {
@@ -171,7 +194,7 @@ export const calendar: Capability[] = [
 		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
 			return env.BUREAU.createEvent(
-				input as z.infer<typeof createEventSchema>,
+				defaultAllDayDuration(input as z.infer<typeof createEventSchema>),
 			);
 		},
 	},
@@ -189,7 +212,7 @@ export const calendar: Capability[] = [
 		handler: async (input, { env }) => {
 			if (!env.BUREAU) return unavailable();
 			return env.BUREAU.updateEvent(
-				input as z.infer<typeof updateEventSchema>,
+				defaultAllDayDuration(input as z.infer<typeof updateEventSchema>),
 			);
 		},
 	},

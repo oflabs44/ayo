@@ -137,6 +137,69 @@ describe("calendar capabilities", () => {
 		expect(bureau.createEvent).toHaveBeenCalledWith(eventWrite);
 	});
 
+	it("defaults a single all-day event to one day", async () => {
+		const { bureau, dispatch } = createHarness();
+		const birthday = {
+			address,
+			calendar: calendarId,
+			summary: "Birthday",
+			start: "1988-10-05",
+			allDay: true,
+			rrule: "FREQ=YEARLY",
+		};
+
+		await dispatch.calendar_event_create!(birthday);
+		await dispatch.calendar_event_update!({
+			...birthday,
+			id: eventId,
+			etag: '"event-v2"',
+		});
+
+		expect(bureau.createEvent).toHaveBeenCalledWith({
+			...birthday,
+			duration: "P1D",
+		});
+		expect(bureau.updateEvent).toHaveBeenCalledWith(
+			expect.objectContaining({ duration: "P1D" }),
+		);
+	});
+
+	it("keeps an explicit span on a multi-day all-day event", async () => {
+		const { bureau, dispatch } = createHarness();
+		const holiday = {
+			address,
+			calendar: calendarId,
+			summary: "Holiday",
+			start: "2026-10-05",
+			allDay: true,
+		};
+
+		await dispatch.calendar_event_create!({ ...holiday, duration: "P3D" });
+		await dispatch.calendar_event_create!({ ...holiday, end: "2026-10-08" });
+
+		expect(bureau.createEvent).toHaveBeenNthCalledWith(1, {
+			...holiday,
+			duration: "P3D",
+		});
+		expect(bureau.createEvent).toHaveBeenNthCalledWith(2, {
+			...holiday,
+			end: "2026-10-08",
+		});
+	});
+
+	it("still requires end or duration for a timed event", async () => {
+		const { bureau, dispatch } = createHarness();
+		const { end: _end, ...timedWithoutEnd } = eventWrite;
+
+		await expect(
+			dispatch.calendar_event_create!(timedWithoutEnd),
+		).rejects.toThrow("A timed event needs end or duration");
+		await expect(
+			dispatch.calendar_event_create!({ ...eventWrite, duration: "PT1H" }),
+		).rejects.toThrow("Pass end or duration, not both");
+		expect(bureau.createEvent).not.toHaveBeenCalled();
+	});
+
 	it("updates an event with its required ETag and exact Bureau RPC shape", async () => {
 		const { bureau, dispatch } = createHarness();
 		const input = { ...eventWrite, id: eventId, etag: '"event-v2"' };

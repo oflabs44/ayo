@@ -17,6 +17,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.4.3)
+      acorn:
+        specifier: ^8.18.0
+        version: 8.18.0
       jose:
         specifier: ^6.2.9
         version: 6.2.9
