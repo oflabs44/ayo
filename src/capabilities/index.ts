@@ -58,7 +58,7 @@ export const capabilityRegistry = {
 	},
 	contacts: {
 		description:
-			"List address books and look up, save, update, and remove contacts",
+			"List address books; look up, save, update, and remove contacts; and manage contact groups",
 		capabilities: contacts,
 	},
 	// Declared after email: search breaks score ties by declaration order, and

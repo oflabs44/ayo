@@ -174,6 +174,18 @@ type BureauContactWrite = {
 	categories?: string[];
 	photo?: BureauContactPhoto;
 };
+type BureauContactGroupSummary = {
+	id: string;
+	addressbook: string;
+	uid: string | null;
+	name: string | null;
+	memberCount: number;
+	etag: string;
+};
+type BureauContactGroup = Omit<BureauContactGroupSummary, "memberCount"> & {
+	members: Array<{ id: string; uid: string; fn: string | null }>;
+	unresolvedMemberUids: string[];
+};
 type BureauContactUpdate = Omit<BureauContactWrite, "photo"> & {
 	id: string;
 	etag: string;
@@ -358,6 +370,7 @@ export type BureauBinding = {
 		address: string;
 		q?: string;
 		addressbook?: string;
+		categories?: string[];
 	}): Promise<BureauContact[]>;
 	getContact(input: {
 		address: string;
@@ -366,6 +379,34 @@ export type BureauBinding = {
 	createContact(input: BureauContactWrite): Promise<BureauContact>;
 	updateContact(input: BureauContactUpdate): Promise<BureauContact>;
 	removeContact(input: {
+		address: string;
+		id: string;
+		etag?: string;
+	}): Promise<{ id: string }>;
+	listContactGroups(input: {
+		address: string;
+		addressbook?: string;
+	}): Promise<BureauContactGroupSummary[]>;
+	getContactGroup(input: {
+		address: string;
+		id: string;
+	}): Promise<BureauContactGroup>;
+	createContactGroup(input: {
+		address: string;
+		addressbook: string;
+		name: string;
+		members?: string[];
+	}): Promise<BureauContactGroup>;
+	updateContactGroup(input: {
+		address: string;
+		id: string;
+		etag: string;
+		name?: string;
+		addMembers?: string[];
+		removeMembers?: string[];
+		removeMemberUids?: string[];
+	}): Promise<BureauContactGroup>;
+	removeContactGroup(input: {
 		address: string;
 		id: string;
 		etag?: string;

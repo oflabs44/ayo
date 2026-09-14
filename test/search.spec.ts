@@ -104,7 +104,7 @@ describe("capability search", () => {
 				{
 					domain: "contacts",
 					description:
-						"List address books and look up, save, update, and remove contacts",
+						"List address books; look up, save, update, and remove contacts; and manage contact groups",
 					capabilities: [
 						"contact_addressbooks",
 						"contact_find",
@@ -112,6 +112,11 @@ describe("capability search", () => {
 						"contact_create",
 						"contact_update",
 						"contact_delete",
+						"contact_group_list",
+						"contact_group_read",
+						"contact_group_create",
+						"contact_group_update",
+						"contact_group_delete",
 					],
 				},
 				{
@@ -329,6 +334,11 @@ describe("capability search", () => {
 					expect.stringContaining("contact_create\ncontacts"),
 					expect.stringContaining("contact_update\ncontacts"),
 					expect.stringContaining("contact_delete\ncontacts"),
+					expect.stringContaining("contact_group_list\ncontacts"),
+					expect.stringContaining("contact_group_read\ncontacts"),
+					expect.stringContaining("contact_group_create\ncontacts"),
+					expect.stringContaining("contact_group_update\ncontacts"),
+					expect.stringContaining("contact_group_delete\ncontacts"),
 					expect.stringContaining("document_search\ndocuments"),
 					expect.stringContaining("document_read\ndocuments"),
 					expect.stringContaining("document_update\ndocuments"),
@@ -553,6 +563,26 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:contact_group_list",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:contact_group_read",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:contact_group_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:contact_group_update",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:contact_group_delete",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:document_search",
 				namespace: "capabilities",
 			}),
@@ -722,7 +752,7 @@ describe("capability search", () => {
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 85,
+			topK: 90,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(
