@@ -1,9 +1,53 @@
 import { DynamicWorkerExecutor } from "@cloudflare/codemode";
+import { parse } from "acorn";
 import type { Capability } from "./capabilities";
 import { capabilities } from "./capabilities";
 import type { Env, OwnerProps } from "./env";
 
 const TIMEOUT_MS = 30_000;
+
+// Codemode only unwraps a module whose sole statement is `export default`, so a
+// module with helpers beside it would be wrapped verbatim and fail to parse.
+// Inline the default export and call it after the rest of the module body runs.
+export function inlineDefaultExport(code: string): string {
+	// Same fences codemode strips, so fenced modules are inlined too.
+	const source =
+		code
+			.trim()
+			.match(/^```(?:js|javascript|typescript|ts|tsx|jsx)?\s*\n([\s\S]*?)```\s*$/)?.[1] ??
+		code;
+	let statements: ReturnType<typeof parse>["body"];
+	try {
+		statements = parse(source, { ecmaVersion: "latest", sourceType: "module" }).body;
+	} catch {
+		return code;
+	}
+	const defaultExport = statements.find(
+		(statement) => statement.type === "ExportDefaultDeclaration",
+	);
+	if (
+		defaultExport?.type !== "ExportDefaultDeclaration" ||
+		statements.length === 1
+	) {
+		return code;
+	}
+
+	const declaration = defaultExport.declaration;
+	const declarationSource = source.slice(declaration.start, declaration.end);
+	const namedDeclaration =
+		(declaration.type === "FunctionDeclaration" ||
+			declaration.type === "ClassDeclaration") &&
+		declaration.id
+			? declaration.id.name
+			: undefined;
+	const inlinedModule =
+		source.slice(0, defaultExport.start) +
+		(namedDeclaration ? declarationSource : "") +
+		source.slice(defaultExport.end);
+	const entryPoint = namedDeclaration ?? `(${declarationSource})`;
+
+	return `async () => {\n${inlinedModule}\nreturn ${entryPoint}();\n}`;
+}
 
 export type ExecuteOutcome = {
 	result?: unknown;
@@ -33,7 +77,7 @@ export async function executeCode(input: {
 	const startedAt = Date.now();
 
 	try {
-		const outcome = await executor.execute(input.code, [
+		const outcome = await executor.execute(inlineDefaultExport(input.code), [
 			{
 				name: "ayo",
 				fns: buildDispatchTable(capabilities, input.env, input.props),

@@ -6,6 +6,7 @@ import {
 	buildDispatchTable,
 	describeError,
 	executeCode,
+	inlineDefaultExport,
 } from "../src/execute";
 
 const props: OwnerProps = {
@@ -35,6 +36,42 @@ describe("execute sandbox", () => {
 	it("adds a useful hint when the timeout budget is exhausted", () => {
 		expect(describeError("Execution timed out", 30_000)).toBe(
 			"Execution timed out — the script exceeded the 30s budget. Split the work.",
+		);
+	});
+});
+
+describe("default export inlining", () => {
+	it("leaves a lone default export for codemode to normalize", () => {
+		const code = "// note\nexport default async function () { return 7; }";
+
+		expect(inlineDefaultExport(code)).toBe(code);
+	});
+
+	it("calls an anonymous default export after top-level helpers", () => {
+		expect(
+			inlineDefaultExport(
+				"const X = 1;\nexport default async function () { return X; }",
+			),
+		).toBe(
+			"async () => {\nconst X = 1;\n\nreturn (async function () { return X; })();\n}",
+		);
+	});
+
+	it("inlines a module wrapped in a Markdown code fence", () => {
+		expect(
+			inlineDefaultExport(
+				"```js\nconst X = 1;\nexport default async () => X;\n```",
+			),
+		).toBe("async () => {\nconst X = 1;\n\n\nreturn (async () => X)();\n}");
+	});
+
+	it("keeps a named default export hoisted and calls it by name", () => {
+		expect(
+			inlineDefaultExport(
+				"export default async function main() { return f(); }\nfunction f() { return 6; }",
+			),
+		).toBe(
+			"async () => {\nasync function main() { return f(); }\nfunction f() { return 6; }\nreturn main();\n}",
 		);
 	});
 });
