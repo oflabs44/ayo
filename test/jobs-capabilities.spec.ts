@@ -89,10 +89,27 @@ describe("job capabilities", () => {
 			},
 		});
 		await expect(
-			dispatch.job_event_catalog!({ kind: "contact.changed" }),
+			dispatch.job_event_catalog!({ kind: "contact.updated" }),
 		).resolves.toMatchObject({
 			paramsShape: { event: { data: { uid: "string | null" } } },
 		});
+	});
+
+	it("accepts a new split event kind and rejects the old *.changed kind", async () => {
+		const { dispatch } = createHarness();
+
+		await expect(
+			dispatch.job_create!({
+				...createInput,
+				trigger: { source: "bureau", kind: "event.created" },
+			}),
+		).resolves.toMatchObject({ created: true });
+		await expect(
+			dispatch.job_create!({
+				...createInput,
+				trigger: { source: "bureau", kind: "event.changed" },
+			}),
+		).rejects.toThrow("Unknown Bureau event kind");
 	});
 
 	it("creates without an expiry when expiresAt is omitted", async () => {
