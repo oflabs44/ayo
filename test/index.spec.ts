@@ -27,6 +27,7 @@ function createTestEnv(label: string): Env {
 		ACCESS_OIDC_ISSUER: `${ACCESS_ISSUER_BASE}/${label}-${issuerSequence}`,
 		JOBS_DB: env.JOBS_DB,
 		OAUTH_KV: env.OAUTH_KV,
+		PUBLIC_BASE_URL: ORIGIN,
 		SEARCH_OFFLINE: "true",
 	} as Env;
 }

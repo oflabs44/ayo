@@ -18,7 +18,7 @@
 	},
 	"dependencies": {
 		"@cloudflare/codemode": "^0.5.1",
-		"@cloudflare/workers-oauth-provider": "^0.10.3",
+		"@cloudflare/workers-oauth-provider": "^1.2.1",
 		"@modelcontextprotocol/sdk": "^1.30.0",
 		"acorn": "^8.18.0",
 		"jose": "^6.2.9",
