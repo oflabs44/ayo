@@ -8,19 +8,29 @@ import { runDueJobs } from "./jobs/runner";
 import { McpHandler } from "./mcp";
 import { accessHandler } from "./oauth/access-oidc";
 
-const oauthProvider = new OAuthProvider<Env>({
-	apiRoute: "/mcp",
-	apiHandler: McpHandler,
-	defaultHandler: accessHandler,
-	authorizeEndpoint: "/authorize",
-	tokenEndpoint: "/oauth/token",
-	clientRegistrationEndpoint: "/oauth/register",
-	scopesSupported: ["mcp"],
-	resourceMetadata: {
-		scopes_supported: ["mcp"],
-		resource_name: "Ayo MCP server",
-	},
-});
+// The provider needs the canonical resource (every token's audience) at
+// construction, and it must come from PUBLIC_BASE_URL, which only exists on
+// env. So the provider is built on first request and cached: PUBLIC_BASE_URL
+// is a plain var, constant for the life of the isolate.
+let oauthProvider: OAuthProvider<Env> | undefined;
+
+function oauthProviderFor(env: Env): OAuthProvider<Env> {
+	oauthProvider ??= new OAuthProvider<Env>({
+		apiRoute: "/mcp",
+		apiHandler: McpHandler,
+		defaultHandler: accessHandler,
+		authorizeEndpoint: "/authorize",
+		tokenEndpoint: "/oauth/token",
+		clientRegistrationEndpoint: "/oauth/register",
+		scopesSupported: ["mcp"],
+		requiredScopes: ["mcp"],
+		resourceMetadata: {
+			resource: `${env.PUBLIC_BASE_URL}/mcp`,
+			resource_name: "Ayo MCP server",
+		},
+	});
+	return oauthProvider;
+}
 
 function methodNotAllowed(allow: string): Response {
 	return new Response(null, { status: 405, headers: { Allow: allow } });
@@ -50,7 +60,7 @@ export default {
 			return handleDocumentFile(env, fileMatch[1]!);
 		}
 
-		return oauthProvider.fetch(request, env, ctx);
+		return oauthProviderFor(env).fetch(request, env, ctx);
 	},
 	scheduled: (
 		_controller: ScheduledController,
