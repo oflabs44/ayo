@@ -566,6 +566,16 @@ export type FilesBinding = {
 	getDocumentPreview(input: { id: string }): Promise<Response>;
 };
 
+/** The `ocr` Worker's `Ocr` WorkerEntrypoint. Errors arrive as `Error` whose
+ * message starts with a code: not_a_pdf, too_large, unsupported_language,
+ * timeout, or ocr_failed. */
+export type OcrBinding = {
+	extract(
+		pdf: ReadableStream<Uint8Array> | Uint8Array,
+		options?: { languages?: string[] },
+	): Promise<{ text: string; pages: number }>;
+};
+
 type VectorizeBinding = {
 	deleteByIds(ids: string[]): Promise<unknown>;
 	upsert(
@@ -604,6 +614,7 @@ export type Env = {
 	NOTEBOOK_STORE_FOR_TESTS?: NotebookStore;
 	OAUTH_KV: KVNamespace;
 	OAUTH_PROVIDER: OAuthHelpers;
+	OCR?: OcrBinding;
 	/** Public origin of this Worker, e.g. https://ayo.oflabs.dev */
 	PUBLIC_BASE_URL: string;
 	SEARCH_OFFLINE?: string;

@@ -287,6 +287,24 @@ describe("OAuth-protected MCP worker", () => {
 		expect(response.status).toBe(410);
 	});
 
+	it("reserves the ocr extract route and routes its ticket before OAuth", async () => {
+		const testEnv = createTestEnv("ocr-extract-route");
+		testEnv.OCR = {} as NonNullable<Env["OCR"]>;
+
+		const wrongMethod = await dispatch(
+			new Request(`${ORIGIN}/ocr/extract/bogus`),
+			testEnv,
+		);
+		const invalidTicket = await dispatch(
+			new Request(`${ORIGIN}/ocr/extract/bogus`, { method: "POST" }),
+			testEnv,
+		);
+
+		expect(wrongMethod.status).toBe(405);
+		expect(wrongMethod.headers.get("Allow")).toBe("POST");
+		expect(invalidTicket.status).toBe(410);
+	});
+
 	it("prunes expired document tickets from the scheduled handler", async () => {
 		const testEnv = createTestEnv("document-ticket-pruning");
 		await testEnv.JOBS_DB.prepare(

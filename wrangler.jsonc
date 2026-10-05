@@ -62,5 +62,10 @@
 			"service": "bureau-files",
 			"entrypoint": "FilesRpc",
 		},
+		{
+			"binding": "OCR",
+			"service": "ocr",
+			"entrypoint": "Ocr",
+		},
 	],
 }
