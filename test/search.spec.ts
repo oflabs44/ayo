@@ -59,21 +59,22 @@ describe("capability search", () => {
 				{
 					domain: "email",
 					description:
-						"Manage folders and search, read, draft, send, move, and flag email",
+						"List accounts, manage folders and tags, and search, read, draft, send, move, trash, and flag email",
 					capabilities: [
+						"email_accounts",
 						"email_mailboxes",
 						"email_mailbox_create",
 						"email_mailbox_rename",
 						"email_mailbox_delete",
 						"email_tags",
-						"email_tag_create",
-						"email_tag_update",
-						"email_tag_delete",
+						"email_tag",
+						"email_untag",
 						"email_search",
 						"email_read",
 						"email_draft",
 						"email_send",
 						"email_move",
+						"email_trash",
 						"email_flag",
 					],
 				},
@@ -343,19 +344,20 @@ describe("capability search", () => {
 					expect.stringContaining("memory_remember\nmemory"),
 					expect.stringContaining("memory_recall\nmemory"),
 					expect.stringContaining("memory_forget\nmemory"),
+					expect.stringContaining("email_accounts\nemail"),
 					expect.stringContaining("email_mailboxes\nemail"),
 					expect.stringContaining("email_mailbox_create\nemail"),
 					expect.stringContaining("email_mailbox_rename\nemail"),
 					expect.stringContaining("email_mailbox_delete\nemail"),
 					expect.stringContaining("email_tags\nemail"),
-					expect.stringContaining("email_tag_create\nemail"),
-					expect.stringContaining("email_tag_update\nemail"),
-					expect.stringContaining("email_tag_delete\nemail"),
+					expect.stringContaining("email_tag\nemail"),
+					expect.stringContaining("email_untag\nemail"),
 					expect.stringContaining("email_search\nemail"),
 					expect.stringContaining("email_read\nemail"),
 					expect.stringContaining("email_draft\nemail"),
 					expect.stringContaining("email_send\nemail"),
 					expect.stringContaining("email_move\nemail"),
+					expect.stringContaining("email_trash\nemail"),
 					expect.stringContaining("email_flag\nemail"),
 					expect.stringContaining("calendar_calendars\ncalendar"),
 					expect.stringContaining("calendar_create\ncalendar"),
@@ -477,6 +479,10 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:email_accounts",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:email_mailboxes",
 				namespace: "capabilities",
 			}),
@@ -497,15 +503,11 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
-				id: "capability:email_tag_create",
+				id: "capability:email_tag",
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
-				id: "capability:email_tag_update",
-				namespace: "capabilities",
-			}),
-			expect.objectContaining({
-				id: "capability:email_tag_delete",
+				id: "capability:email_untag",
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
@@ -526,6 +528,10 @@ describe("capability search", () => {
 			}),
 			expect.objectContaining({
 				id: "capability:email_move",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:email_trash",
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
@@ -798,7 +804,7 @@ describe("capability search", () => {
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 91,
+			topK: 92,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(

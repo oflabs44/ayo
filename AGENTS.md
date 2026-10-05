@@ -68,7 +68,13 @@ against those capabilities, instead of one MCP tool per capability.
   fresh Dynamic Worker for each execute call. Dynamic Workers are available in
   open beta on the Workers paid plan.
 - `BUREAU` — service binding to the `BureauRpc` entrypoint on the `bureau`
-  Worker, used as the production notebook backend.
+  Worker: the production notebook backend, and calendar, tasks, and contacts.
+  It no longer serves mail.
+- `MAIL_READER` and `MAIL_WRITER` — service bindings to the `MailReader` and
+  `MailWriter` entrypoints on the `mycloud-mail` Worker, the email backend.
+  Their methods take positional arguments, account address first. The types in
+  `src/env.ts` list only the methods Ayo calls. Never bind `MailAdmin`, and do
+  not expose `emptyFolder` or `deleteMessagesForever`.
 - `FILES` — service binding to the `FilesRpc` entrypoint on the `bureau-files`
   Worker, used as the production documents backend. The `FilesBinding` type in
   `src/env.ts` mirrors that entrypoint's final contract; list and bulk calls
@@ -184,10 +190,13 @@ Every new capability must ship with:
 
 v1 is complete and deployed: OAuth, two-signal search, the execute sandbox,
 the capability domains in `capabilityRegistry`, memory with ambient
-memoryContext surfacing, and canonical links. Email send is draft-first:
-`email_draft` stores the outgoing message in KV (24h) and `email_send` only
-accepts a stored draftId — there is no direct-send path. GitHub issue reporting
-is limited to `oflabs44/ayo` and `oflabs44/bureau`. Known backlog: similarity
+memoryContext surfacing, and canonical links. Email runs on mycloud. Send is
+draft-first: `email_draft` stores the outgoing message in KV (24h) and
+`email_send` only accepts a stored draftId — there is no direct-send path. It
+consumes the draft before the send, so an unconfirmed or broken send cannot be
+retried into a duplicate; only a refused send puts the draft back.
+GitHub issue reporting is limited to `oflabs44/ayo` and `oflabs44/bureau`.
+Known backlog: similarity
 calibration from real use, Bureau reader polish, a scheduled brief-of-the-day
 routine (needs a scheduler and a notify channel), and the 2026-07-28 MCP
 envelope once hosts speak it.
