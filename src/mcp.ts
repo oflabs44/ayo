@@ -35,7 +35,7 @@ function createServer(env: Env, props: OwnerProps): McpServer {
 	server.registerTool(
 		"search",
 		{
-			description: `Discover Ayo capabilities: blank query lists domains, normal text returns ranked matches, and an exact name or name:<capability> returns full details. Pass back a conversationId unchanged to echo it, or omit it to receive one. ${MEMORY_CONTEXT_DESCRIPTION}`,
+			description: `Discover Ayo capabilities: blank query lists domains, normal text returns the ten best matches, and an exact name or name:<capability> returns full details. Pass back a conversationId unchanged to echo it, or omit it to receive one. ${MEMORY_CONTEXT_DESCRIPTION}`,
 			inputSchema: {
 				query: z.string(),
 				conversationId: conversationIdInput,

@@ -22,6 +22,9 @@ const CAPABILITY_NAMESPACE = "capabilities";
 const CONTENT_STAMP_KEY = "search:capabilities:content-stamp";
 const VECTOR_ID_PREFIX = "capability:";
 const OVERVIEW_QUERIES = new Set(["what can you do"]);
+// Every match carries its full input schema. The semantic ranking covers the
+// whole registry, so an uncapped result is the whole registry on every query.
+const MAX_MATCHES = 10;
 
 function callExample(capability: RegisteredCapability): string {
 	return `await ayo.${capability.name}({})`;
@@ -159,6 +162,17 @@ function fuseRankings(
 		});
 	}
 
+	// A capability has no vector for a short time after it is added or
+	// changed, because Vectorize applies an upsert asynchronously. Counting
+	// its lexical rank for both signals keeps it on the same scale as the
+	// rest; with one term it sinks below every capability that has two.
+	const withVector = new Set(vector.map(({ name }) => name));
+	lexical.forEach((capability, index) => {
+		if (!withVector.has(capability.name)) {
+			scores.get(capability.name)!.score += 1 / (RRF_CONSTANT + index + 1);
+		}
+	});
+
 	return [...scores.values()]
 		.sort((left, right) => right.score - left.score || left.order - right.order)
 		.map(({ capability }) => capability);
@@ -196,11 +210,15 @@ export async function searchCapabilities(query: string, env: Env) {
 	const lexical = lexicalRanking(normalizedQuery);
 	if (isSearchOffline(env)) {
 		return {
-			matches: lexical.map(matchDetail),
+			matches: lexical.slice(0, MAX_MATCHES).map(matchDetail),
 			offline: true as const,
 		};
 	}
 
 	const vector = await vectorRanking(normalizedQuery, env);
-	return { matches: fuseRankings(lexical, vector).map(matchDetail) };
+	return {
+		matches: fuseRankings(lexical, vector)
+			.slice(0, MAX_MATCHES)
+			.map(matchDetail),
+	};
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { capabilities } from "../src/capabilities/index";
 import type { Env } from "../src/env";
 import { searchCapabilities } from "../src/search";
 import { identityBodyScore } from "../src/search-support";
@@ -257,6 +258,40 @@ describe("capability search", () => {
 			"whoami",
 			"job_create",
 		]);
+	});
+
+	it("returns at most ten matches", async () => {
+		const result = (await searchCapabilities("this document", offlineEnv)) as {
+			matches: unknown[];
+		};
+
+		expect(result.matches).toHaveLength(10);
+	});
+
+	it("keeps a lexical winner on top while it has no vector yet", async () => {
+		const onlineEnv = {
+			AI: {
+				run: vi.fn(async (_model: string, input: { text: string[] }) => ({
+					data: input.text.map(() => Array<number>(384).fill(0)),
+				})),
+			},
+			VECTORIZE: {
+				upsert: vi.fn(async () => undefined),
+				query: vi.fn(async () => ({
+					matches: capabilities
+						.filter(({ name }) => name !== "ocr_extract")
+						.map(({ name }) => ({ id: `capability:${name}`, score: 0.5 })),
+				})),
+			},
+			OAUTH_KV: { get: vi.fn(async () => null), put: vi.fn(async () => undefined) },
+		} as unknown as Env;
+
+		const result = (await searchCapabilities(
+			"read the text in this screenshot",
+			onlineEnv,
+		)) as { matches: Array<{ name: string }> };
+
+		expect(result.matches[0]?.name).toBe("ocr_extract");
 	});
 
 	it("self-indexes and fuses mocked semantic results", async () => {
