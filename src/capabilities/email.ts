@@ -98,9 +98,29 @@ const draftInputSchema = z
 			input.reference?.action === "replyAll",
 		{ message: "to is required unless this is a reply", path: ["to"] },
 	);
-type StoredDraft = z.infer<typeof draftInputSchema> & {
-	to: z.infer<typeof recipientSchema>[];
-};
+// What email_draft writes to KV, checked again before it reaches the writer.
+// Addresses filled from a received mail need not pass z.email(); the writer
+// has its own address rule.
+const storedRecipientSchema = z.strictObject({
+	address: z.string().min(1),
+	name: z.string().min(1).optional(),
+});
+const storedDraftSchema = z.strictObject({
+	address: z.email(),
+	to: z.array(storedRecipientSchema).min(1),
+	cc: z.array(storedRecipientSchema).optional(),
+	bcc: z.array(storedRecipientSchema).optional(),
+	subject: z.string(),
+	body: z.string(),
+	html: z.string().optional(),
+	attachments: z.array(attachmentReferenceSchema).optional(),
+	reference: z
+		.strictObject({
+			id: z.string().min(1),
+			action: z.enum(["reply", "replyAll", "forward"]),
+		})
+		.optional(),
+});
 const sendInputSchema = z.object({ draftId: z.string().min(1) });
 // Strict: a misspelled `folder` would be dropped and widen the action to
 // every copy of the message.
@@ -455,7 +475,7 @@ export const email: Capability[] = [
 				};
 			}
 
-			const draft = JSON.parse(storedDraft) as StoredDraft;
+			const draft = storedDraftSchema.parse(JSON.parse(storedDraft));
 			// The writer throws on a key it does not know, so name each field.
 			const mail: ComposedMail = {
 				to: draft.to,
