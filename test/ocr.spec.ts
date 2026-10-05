@@ -111,7 +111,7 @@ describe("ocr extract route", () => {
 		expect(response.status).toBe(502);
 		await expect(response.json()).resolves.toEqual({
 			error: "ocr_failed",
-			message: "The PDF could not be read.",
+			message: "The file could not be read.",
 		});
 	});
 });

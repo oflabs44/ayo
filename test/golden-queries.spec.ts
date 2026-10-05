@@ -75,6 +75,7 @@ const goldenQueries = [
 	["run ocr on a pdf from my laptop", "ocr_extract"],
 	["extract the text from a scanned pdf", "ocr_extract"],
 	["what is written in this scanned letter", "ocr_extract"],
+	["get the words out of this phone picture of a receipt", "ocr_extract"],
 	["download this document's original file", "document_file"],
 	["get the document file", "document_file"],
 	["which email accounts do you have", "accounts_list"],

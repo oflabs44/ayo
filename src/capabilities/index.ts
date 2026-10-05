@@ -71,7 +71,8 @@ export const capabilityRegistry = {
 		capabilities: documents,
 	},
 	ocr: {
-		description: "Read the text out of a scanned PDF without archiving it",
+		description:
+			"Read the text out of a scanned PDF, photo, or screenshot without archiving it",
 		capabilities: ocr,
 	},
 	jobs: {
