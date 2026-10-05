@@ -98,10 +98,10 @@ describe("ocr extract route", () => {
 		await expect(response.json()).resolves.toMatchObject({ error: "not_a_pdf" });
 	});
 
-	it("reports a failure with no known code as a generic 502", async () => {
+	it("reports any other backend failure as a generic 502 without its detail", async () => {
 		const env = createHarness(
 			vi.fn(async () => {
-				throw new Error("constructor: internal detail");
+				throw new Error("ocr_failed: ocrmypdf failed: /tmp/work/in.pdf");
 			}),
 		);
 		const { token } = await createTicket(env, "ocr", {});

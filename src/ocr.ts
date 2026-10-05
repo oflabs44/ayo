@@ -1,14 +1,14 @@
 import { consumeTicket } from "./documents/tickets";
 import type { Env } from "./env";
 
-// The `ocr` Worker's error messages start with one of these codes. A failure
-// with no known code is answered as ocr_failed with a generic message.
+// Codes whose message is safe to show the caller. Every other failure,
+// ocr_failed included, is logged and answered with a generic 502: its message
+// can carry container stderr, and this route is unauthenticated.
 const STATUS_BY_OCR_ERROR_CODE: Record<string, number> = {
 	not_a_pdf: 415,
 	too_large: 413,
 	unsupported_language: 400,
 	timeout: 504,
-	ocr_failed: 502,
 };
 
 export function ocrExtractUrl(env: Env, token: string): string {
