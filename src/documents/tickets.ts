@@ -2,7 +2,7 @@ import type { Env } from "../env";
 
 const TICKET_TTL_SECONDS = 5 * 60;
 
-export type TicketKind = "upload" | "download";
+export type TicketKind = "upload" | "download" | "ocr";
 
 export type UploadTicketPayload = {
 	filename: string;
@@ -17,9 +17,14 @@ export type DownloadTicketPayload = {
 	variant: "original" | "preview";
 };
 
+export type OcrTicketPayload = {
+	languages?: string[];
+};
+
 type TicketPayloads = {
 	upload: UploadTicketPayload;
 	download: DownloadTicketPayload;
+	ocr: OcrTicketPayload;
 };
 
 function toBase64Url(bytes: Uint8Array): string {

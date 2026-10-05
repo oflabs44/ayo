@@ -147,6 +147,12 @@ describe("capability search", () => {
 					],
 				},
 				{
+					domain: "ocr",
+					description:
+						"Read the text out of a scanned PDF without archiving it",
+					capabilities: ["ocr_extract"],
+				},
+				{
 					domain: "jobs",
 					description:
 						"Schedule, inspect, run, update, and remove unattended scripts",
@@ -359,6 +365,7 @@ describe("capability search", () => {
 					expect.stringContaining("document_tags_update\ndocuments"),
 					expect.stringContaining("document_upload\ndocuments"),
 					expect.stringContaining("document_file\ndocuments"),
+					expect.stringContaining("ocr_extract\nocr"),
 					expect.stringContaining("job_event_catalog\njobs"),
 					expect.stringContaining("job_create\njobs"),
 					expect.stringContaining("job_list\njobs"),
@@ -663,6 +670,10 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:ocr_extract",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:job_event_catalog",
 				namespace: "capabilities",
 			}),
@@ -752,7 +763,7 @@ describe("capability search", () => {
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 90,
+			topK: 91,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(

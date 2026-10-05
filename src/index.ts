@@ -7,6 +7,7 @@ import { handleHook } from "./hooks";
 import { runDueJobs } from "./jobs/runner";
 import { McpHandler } from "./mcp";
 import { accessHandler } from "./oauth/access-oidc";
+import { handleOcrExtract } from "./ocr";
 
 // The provider needs the canonical resource (every token's audience) at
 // construction, and it must come from PUBLIC_BASE_URL, which only exists on
@@ -48,7 +49,7 @@ export default {
 
 		// Unauthenticated: the opaque, single-use ticket is the credential,
 		// minted by document_upload/document_file and never the caller's
-		// OAuth bearer token.
+		// OAuth bearer token. ocr_extract mints the OCR ticket the same way.
 		const uploadMatch = /^\/documents\/upload\/([^/]+)$/.exec(path);
 		if (uploadMatch !== null) {
 			if (request.method !== "PUT") return methodNotAllowed("PUT");
@@ -58,6 +59,11 @@ export default {
 		if (fileMatch !== null) {
 			if (request.method !== "GET") return methodNotAllowed("GET");
 			return handleDocumentFile(env, fileMatch[1]!);
+		}
+		const ocrMatch = /^\/ocr\/extract\/([^/]+)$/.exec(path);
+		if (ocrMatch !== null) {
+			if (request.method !== "POST") return methodNotAllowed("POST");
+			return handleOcrExtract(request, env, ocrMatch[1]!);
 		}
 
 		return oauthProviderFor(env).fetch(request, env, ctx);

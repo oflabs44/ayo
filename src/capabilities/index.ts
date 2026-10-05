@@ -11,6 +11,7 @@ import { memory } from "./memory";
 import { meta } from "./meta";
 import { migadu } from "./migadu";
 import { notebook } from "./notebook";
+import { ocr } from "./ocr";
 import { tasks } from "./tasks";
 
 export type CapabilityContext = {
@@ -68,6 +69,10 @@ export const capabilityRegistry = {
 		description:
 			"Search, read, update, move, trash, restore, and reprocess documents; manage folders and tags; upload and download files",
 		capabilities: documents,
+	},
+	ocr: {
+		description: "Read the text out of a scanned PDF without archiving it",
+		capabilities: ocr,
 	},
 	jobs: {
 		description: "Schedule, inspect, run, update, and remove unattended scripts",
