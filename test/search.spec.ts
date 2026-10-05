@@ -149,7 +149,7 @@ describe("capability search", () => {
 				{
 					domain: "ocr",
 					description:
-						"Read the text out of a scanned PDF without archiving it",
+						"Read the text out of a scanned PDF, photo, or screenshot without archiving it",
 					capabilities: ["ocr_extract"],
 				},
 				{

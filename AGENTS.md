@@ -74,7 +74,7 @@ against those capabilities, instead of one MCP tool per capability.
   `src/env.ts` mirrors that entrypoint's final contract; list and bulk calls
   return `PublicDocumentSummary`, while detail calls return `PublicDocument`.
 - `OCR` — service binding to the `Ocr` entrypoint on the `ocr` Worker
-  (`oflabs44/ocr`), which does the OCR in a container. Ayo only relays a PDF
+  (`oflabs44/ocr`), which does the OCR in a container. Ayo only relays a file
   to its `extract` method.
 - `GITHUB_TOKEN` — Worker secret for direct GitHub REST calls. Set it with
   `pnpm exec wrangler secret put GITHUB_TOKEN`. Use a fine-grained PAT limited
@@ -138,12 +138,13 @@ against those capabilities, instead of one MCP tool per capability.
 
 ## OCR
 
-- `ocr_extract` reads a local PDF without archiving it. It mints a
+- `ocr_extract` reads a local PDF, PNG, or JPEG without archiving it. It mints a
   five-minute ticket (kind `ocr`, same table and guarantees as the document
   tickets) and returns an unauthenticated `POST /ocr/extract/:token` URL.
   `src/ocr.ts` streams the request body straight to `OCR.extract` and answers
   with `{ text, pages }`; nothing is stored.
-- The `ocr` Worker owns the limits (PDF only, 64 MiB, 300 s, `deu` and `eng`).
+- The `ocr` Worker owns the limits (PDF, PNG, or JPEG; 64 MiB; 64 megapixels
+  per image; 300 s; `deu` and `eng`).
   Its errors are `Error`s whose message starts with a code, which the route
   maps to an HTTP status and a JSON `{ error, message }` body.
 

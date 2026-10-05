@@ -17,8 +17,8 @@ export function ocrExtractUrl(env: Env, token: string): string {
 
 /**
  * Streams the request body straight to the `ocr` Worker - it is never
- * buffered or stored here. That Worker enforces the PDF check, the size
- * limit, and the time limit.
+ * buffered or stored here. That Worker enforces the file type check, the
+ * size limits, and the time limit.
  */
 export async function handleOcrExtract(
 	request: Request,
@@ -37,7 +37,7 @@ export async function handleOcrExtract(
 	}
 	if (request.body === null) {
 		return new Response(
-			"A PDF body is required. This link is now spent; request a new one.",
+			"A file body is required. This link is now spent; request a new one.",
 			{ status: 400 },
 		);
 	}
@@ -53,7 +53,7 @@ export async function handleOcrExtract(
 		if (!Object.hasOwn(STATUS_BY_OCR_ERROR_CODE, code)) {
 			console.error("ayo ocr extract failed", error);
 			return Response.json(
-				{ error: "ocr_failed", message: "The PDF could not be read." },
+				{ error: "ocr_failed", message: "The file could not be read." },
 				{ status: 502 },
 			);
 		}
