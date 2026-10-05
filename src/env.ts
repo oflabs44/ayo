@@ -28,26 +28,6 @@ type BureauNotebookDocMeta = {
 
 type BureauNotebookDoc = BureauNotebookDocMeta & { content: string };
 
-type BureauMessageSummary = { id: string } & Record<string, unknown>;
-type BureauThread = { messages: BureauMessageSummary[] } & Record<
-	string,
-	unknown
->;
-type BureauRecipient = { address: string; name?: string };
-type BureauMailbox = {
-	path: string;
-	name: string;
-	/** One of Bureau's SPECIAL_USE_ATTRIBUTES; never \Inbox, which IMAP has no
-	 * attribute for. INBOX is identified by its path. */
-	specialUse: string | null;
-	delimiter: string;
-	/** \Noselect: a naming node that cannot be SELECTed, so not a move target. */
-	noselect: boolean;
-	/** Present only when the server advertises LIST-STATUS (RFC 5819);
-	 * absent is not zero. */
-	messages?: number;
-	unseen?: number;
-};
 type BureauCalendar = {
 	id: string;
 	account: string;
@@ -107,13 +87,6 @@ type BureauTodo = {
 	rrule?: string;
 	alarms: BureauAlarmRead[];
 	etag: string;
-};
-type BureauTag = {
-	id: string;
-	name: string;
-	keyword: string;
-	color: string | null;
-	createdAt: string;
 };
 type BureauContactValue = {
 	value: string;
@@ -251,78 +224,6 @@ export type BureauBinding = {
 	}): Promise<Array<{ version: string; updatedAt: string }>>;
 	deleteNotebookDoc(input: { path: string }): Promise<boolean>;
 	listAccounts(input: Record<string, never>): Promise<unknown[]>;
-	listMailboxes(input: { address: string }): Promise<BureauMailbox[]>;
-	createMailbox(input: {
-		address: string;
-		path: string;
-	}): Promise<{ path: string }>;
-	renameMailbox(input: {
-		address: string;
-		path: string;
-		to: string;
-	}): Promise<{ path: string }>;
-	deleteMailbox(input: {
-		address: string;
-		path: string;
-	}): Promise<{ path: string }>;
-	listTags(input: Record<string, never>): Promise<BureauTag[]>;
-	createTag(input: { name: string; color?: string }): Promise<BureauTag>;
-	updateTag(input: {
-		id: string;
-		name?: string;
-		color?: string | null;
-	}): Promise<BureauTag>;
-	deleteTag(input: { id: string }): Promise<{ id: string }>;
-	listThreads(input: {
-		address: string;
-		folder?: string;
-		starred?: boolean;
-		tag?: string;
-		limit?: number;
-		before?: string;
-		beforeId?: string;
-	}): Promise<unknown[]>;
-	listMessages(input: {
-		address: string;
-		folder?: string;
-		threadId?: string;
-		tag?: string;
-		limit?: number;
-		before?: string;
-	}): Promise<unknown[]>;
-	getThread(input: { address: string; id: string }): Promise<BureauThread>;
-	getMessage(input: {
-		address: string;
-		id: string;
-	}): Promise<Record<string, unknown>>;
-	moveMessage(input: {
-		address: string;
-		id: string;
-		to: string;
-	}): Promise<BureauMessageSummary>;
-	setMessageFlags(input: {
-		address: string;
-		id: string;
-		add?: string[];
-		remove?: string[];
-	}): Promise<BureauMessageSummary>;
-	send(input: {
-		address: string;
-		to?: BureauRecipient[];
-		cc?: BureauRecipient[];
-		bcc?: BureauRecipient[];
-		fromName?: string;
-		subject: string;
-		text: string;
-		html?: string;
-		reference?: { id: string; action: "reply" | "replyAll" | "forward" };
-	}): Promise<{
-		id: string | null;
-		threadId: string | null;
-		messageId: string;
-		rejected: string[];
-		warning?: string;
-	}>;
 	listCalendars(input: { address: string }): Promise<BureauCalendar[]>;
 	createCalendar(input: {
 		address: string;
@@ -411,6 +312,195 @@ export type BureauBinding = {
 		id: string;
 		etag?: string;
 	}): Promise<{ id: string }>;
+};
+
+type MailAddress = { address: string; name: string | null };
+type MailMessageTag = {
+	tag: string;
+	/** "user", "agent", or the classifier: "rule" or "clef". */
+	source: string;
+	confidence: number | null;
+};
+type MailMessage = {
+	id: string;
+	threadId: string;
+	rfcMessageId: string | null;
+	subject: string | null;
+	from: MailAddress | null;
+	to: MailAddress[];
+	cc: MailAddress[];
+	date: string | null;
+	snippet: string | null;
+	hasAttachments: boolean;
+	attachments: Array<{
+		index: number;
+		filename: string | null;
+		mimeType: string;
+		size: number;
+	}>;
+	/** One per live copy; a message is unread when a copy has no \Seen flag. */
+	copies: Array<{ driverMessageId: string; folder: string; flags: string[] }>;
+	tags: MailMessageTag[];
+};
+type MailMessageDetail = MailMessage & {
+	text: string | null;
+	inReplyTo: string | null;
+	references: string[];
+	judgment: { version: number; answers: unknown } | null;
+};
+type MailListFilters = {
+	folder?: string;
+	from?: string;
+	after?: string;
+	before?: string;
+	hasAttachments?: boolean;
+	tags?: string[];
+	unread?: boolean;
+	flagged?: boolean;
+	limit?: number;
+};
+type MailFolder = {
+	path: string;
+	specialUse: string | null;
+	delimiter: string;
+};
+type MailBatchResult = {
+	succeeded: string[];
+	failed: Array<{ messageId: string; reason: string }>;
+};
+type MailCopiesOptions = { folder?: string };
+
+type MailRecipient = { address: string; name?: string | null };
+export type ComposedMail = {
+	to: MailRecipient[];
+	cc?: MailRecipient[];
+	bcc?: MailRecipient[];
+	subject: string;
+	text: string;
+	html?: string;
+	/** References only: Ayo never moves attachment bytes through the sandbox. */
+	attachments?: Array<{ messageId: string; index: number; filename?: string }>;
+};
+
+/** "refused": nothing was sent. "unknown": the send was not confirmed, so a
+ * second send can make a duplicate. */
+export type MailSendResult =
+	| {
+			status: "sent";
+			rejected: Array<{ address: string; code: number; response: string }>;
+			sentCopy: { id: string; folder: string } | null;
+			followUpErrors: Array<{
+				step: "sentCopy" | "answered" | "draft";
+				message: string;
+			}>;
+	  }
+	| { status: "refused" | "unknown"; message: string };
+
+/** The `mycloud-mail` Worker's `MailReader` WorkerEntrypoint, limited to the
+ * methods Ayo calls. It ignores unknown option keys, so callers validate names
+ * first. */
+export type MailReaderBinding = {
+	listAccounts(): Promise<
+		Array<{
+			address: string;
+			label: string | null;
+			senderName: string | null;
+			imap: unknown;
+			smtp: unknown;
+		}>
+	>;
+	listFolders(accountAddress: string): Promise<
+		Array<
+			Omit<MailFolder, "delimiter"> & {
+				/** Null until the next poll reports the folder's state. */
+				delimiter: string | null;
+				messageCount: number;
+				unreadCount: number;
+			}
+		>
+	>;
+	listThreads(
+		accountAddress: string,
+		options?: {
+			folder?: string;
+			tags?: string[];
+			unread?: boolean;
+			flagged?: boolean;
+			limit?: number;
+			before?: { lastDate: string | null; id: string };
+		},
+	): Promise<unknown[]>;
+	listMessages(
+		accountAddress: string,
+		options?: MailListFilters & {
+			cursor?: { date: string | null; id: string };
+		},
+	): Promise<MailMessage[]>;
+	getThread(
+		accountAddress: string,
+		threadId: string,
+	): Promise<MailMessage[] | null>;
+	getMessage(
+		accountAddress: string,
+		messageId: string,
+	): Promise<MailMessageDetail | null>;
+	listTags(
+		accountAddress: string,
+	): Promise<Array<{ tag: string; count: number }>>;
+	getReplyRecipients(
+		accountAddress: string,
+		messageId: string,
+		options?: { all?: boolean },
+	): Promise<{ to: MailAddress[]; cc: MailAddress[] }>;
+	/** A null address searches every account. */
+	search(
+		accountAddress: string | null,
+		options: MailListFilters & { query: string },
+	): Promise<unknown[]>;
+};
+
+/** The `mycloud-mail` Worker's `MailWriter` WorkerEntrypoint, limited to the
+ * methods Ayo calls; `emptyFolder` and `deleteMessagesForever` are left out on
+ * purpose. It throws `Unknown field <name>` for an unknown key. */
+export type MailWriterBinding = {
+	moveMessages(
+		accountAddress: string,
+		messageIds: string[],
+		toFolder: string,
+		opts?: MailCopiesOptions,
+	): Promise<MailBatchResult>;
+	trashMessages(
+		accountAddress: string,
+		messageIds: string[],
+		opts?: MailCopiesOptions,
+	): Promise<MailBatchResult>;
+	setFlags(
+		accountAddress: string,
+		messageIds: string[],
+		change: { add?: string[]; remove?: string[] },
+	): Promise<MailBatchResult>;
+	tag(
+		accountAddress: string,
+		messageIds: string[],
+		tag: string,
+	): Promise<MailBatchResult>;
+	untag(
+		accountAddress: string,
+		messageIds: string[],
+		tag: string,
+	): Promise<MailBatchResult>;
+	createFolder(accountAddress: string, path: string): Promise<MailFolder>;
+	renameFolder(
+		accountAddress: string,
+		path: string,
+		to: string,
+	): Promise<MailFolder>;
+	deleteFolder(accountAddress: string, path: string): Promise<void>;
+	send(
+		accountAddress: string,
+		mail: ComposedMail,
+		opts?: { answers?: string },
+	): Promise<MailSendResult>;
 };
 
 export type DocumentType =
@@ -607,6 +697,8 @@ export type Env = {
 	GITHUB_TOKEN?: string;
 	JOBS_DB: D1Database;
 	LOADER?: WorkerLoader;
+	MAIL_READER?: MailReaderBinding;
+	MAIL_WRITER?: MailWriterBinding;
 	/** Test-only seam for direct Migadu REST calls. */
 	MIGADU_FETCH_FOR_TESTS?: typeof fetch;
 	MIGADU_API_KEY?: string;

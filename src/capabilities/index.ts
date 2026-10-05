@@ -46,7 +46,7 @@ export const capabilityRegistry = {
 	},
 	email: {
 		description:
-			"Manage folders and search, read, draft, send, move, and flag email",
+			"List accounts, manage folders and tags, and search, read, draft, send, move, trash, and flag email",
 		capabilities: email,
 	},
 	calendar: {

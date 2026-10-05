@@ -28,13 +28,12 @@ export const meta: Capability[] = [
 	{
 		name: "accounts_list",
 		description:
-			"Tell which mail and calendar accounts are configured, without credentials",
+			"Tell which calendar and contacts accounts are configured, without credentials; email accounts are under email_accounts",
 		inputSchema: z.object({}),
 		keywords: [
-			"email accounts",
-			"list mail accounts",
-			"calendar accounts",
-			"which inbox",
+			"list calendar accounts",
+			"contacts accounts",
+			"caldav carddav accounts",
 			"available addresses",
 		],
 		handler: async (_input, { env }) => {
