@@ -4,7 +4,7 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
-		"deploy": "wrangler d1 migrations apply ayo-jobs --remote && wrangler deploy",
+		"deploy": "wrangler d1 migrations apply ayo-jobs --remote && wrangler d1 migrations apply ayo-ledger --remote && wrangler deploy",
 		"dev": "SEARCH_OFFLINE=true wrangler dev",
 		"start": "wrangler dev",
 		"test": "vitest",

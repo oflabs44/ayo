@@ -39,6 +39,7 @@ against those capabilities, instead of one MCP tool per capability.
   surfacing
 - `src/conversation.ts` — conversationId minting and KV suppression
 - `wrangler.jsonc` — Worker config
+- `src/ledger/` — double-entry ledger store on `LEDGER_DB`
 - `test/` — Vitest with `@cloudflare/vitest-pool-workers`; golden queries and
   the interface-driven store suite live here
 
@@ -64,6 +65,11 @@ against those capabilities, instead of one MCP tool per capability.
   stamp so the next semantic search repopulates it.
 - `SEARCH_OFFLINE=true` disables AI and Vectorize search; the development
   script and test harness set it explicitly.
+- `LEDGER_DB` — D1 database `ayo-ledger` for the ledger domain, with its own
+  migrations in `migrations/ledger` (`migrations/` belongs to `ayo-jobs`).
+  Workers Builds does not apply D1 migrations: apply a new ledger migration
+  with `pnpm exec wrangler d1 migrations apply ayo-ledger --remote` before the
+  merge that needs it.
 - `LOADER` — Worker Loader binding used by `@cloudflare/codemode` to create a
   fresh Dynamic Worker for each execute call. Dynamic Workers are available in
   open beta on the Workers paid plan.
@@ -153,6 +159,26 @@ against those capabilities, instead of one MCP tool per capability.
   per image; 300 s; `deu` and `eng`).
   Its errors are `Error`s whose message starts with a code, which the route
   maps to an HTTP status and a JSON `{ error, message }` body.
+
+## Ledger
+
+- Personal double-entry bookkeeping, EUR only. The ledger records what it is
+  told; it has no import or bank sync, and importers are callers of
+  `ledger_transaction_record`.
+- A transaction has two or more postings that sum to exactly zero. The check
+  runs before the write, and the transaction and its postings go in one D1
+  `batch`, so a failed write leaves nothing behind.
+- Amounts are integer cents in storage (`amount_minor`; positive is a debit,
+  negative is a credit) and decimal strings such as `"12.34"` at the capability
+  boundary. No float touches money. Reports negate income, liabilities, and
+  equity so every figure reads in its natural sign.
+- Entries are immutable: no code path updates or deletes a transaction or a
+  posting. A correction is a reversal, a new transaction with every posting
+  negated and `reverses_id` set. The `UNIQUE` on `reverses_id` allows one
+  reversal per transaction, and a reversal cannot itself be reversed.
+- Balances are never stored; they are sums over postings.
+- An account's type never changes. Closing an account refuses new postings to
+  it, including a reversal that touches it, until it is reopened.
 
 ## Capability authoring rule
 

@@ -39,6 +39,12 @@
 			"database_id": "bc2ca492-0d35-4645-bc47-e494e09a8452",
 			"migrations_dir": "migrations",
 		},
+		{
+			"binding": "LEDGER_DB",
+			"database_name": "ayo-ledger",
+			"database_id": "9740d9cc-20db-4ea0-a264-c20759c73acc",
+			"migrations_dir": "migrations/ledger",
+		},
 	],
 	"kv_namespaces": [
 		{

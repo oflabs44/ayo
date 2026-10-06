@@ -696,6 +696,7 @@ export type Env = {
 	GITHUB_FETCH_FOR_TESTS?: typeof fetch;
 	GITHUB_TOKEN?: string;
 	JOBS_DB: D1Database;
+	LEDGER_DB: D1Database;
 	LOADER?: WorkerLoader;
 	MAIL_READER?: MailReaderBinding;
 	MAIL_WRITER?: MailWriterBinding;

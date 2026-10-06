@@ -197,6 +197,20 @@ describe("capability search", () => {
 					],
 				},
 				{
+					domain: "ledger",
+					description:
+						"Keep the personal books in EUR: record spending and income, check balances, and report net worth",
+					capabilities: [
+						"ledger_account_create",
+						"ledger_account_list",
+						"ledger_account_update",
+						"ledger_transaction_record",
+						"ledger_transaction_reverse",
+						"ledger_transaction_search",
+						"ledger_report",
+					],
+				},
+				{
 					domain: "ai",
 					description:
 						"Run a model to judge, classify, or summarize something",
@@ -424,6 +438,13 @@ describe("capability search", () => {
 					expect.stringContaining("migadu_aliases\nmigadu"),
 					expect.stringContaining("migadu_alias_create\nmigadu"),
 					expect.stringContaining("migadu_alias_delete\nmigadu"),
+					expect.stringContaining("ledger_account_create\nledger"),
+					expect.stringContaining("ledger_account_list\nledger"),
+					expect.stringContaining("ledger_account_update\nledger"),
+					expect.stringContaining("ledger_transaction_record\nledger"),
+					expect.stringContaining("ledger_transaction_reverse\nledger"),
+					expect.stringContaining("ledger_transaction_search\nledger"),
+					expect.stringContaining("ledger_report\nledger"),
 					expect.stringContaining("ai_run\nai"),
 				],
 			},
@@ -799,12 +820,40 @@ describe("capability search", () => {
 				namespace: "capabilities",
 			}),
 			expect.objectContaining({
+				id: "capability:ledger_account_create",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:ledger_account_list",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:ledger_account_update",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:ledger_transaction_record",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:ledger_transaction_reverse",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:ledger_transaction_search",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
+				id: "capability:ledger_report",
+				namespace: "capabilities",
+			}),
+			expect.objectContaining({
 				id: "capability:ai_run",
 				namespace: "capabilities",
 			}),
 		]);
 		expect(query).toHaveBeenCalledWith(expect.any(Array), {
-			topK: 92,
+			topK: 99,
 			namespace: "capabilities",
 		});
 		expect(put).toHaveBeenCalledWith(
