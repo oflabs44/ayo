@@ -7,6 +7,7 @@ import { documents } from "./documents";
 import { email } from "./email";
 import { github } from "./github";
 import { jobs } from "./jobs";
+import { ledger } from "./ledger";
 import { memory } from "./memory";
 import { meta } from "./meta";
 import { migadu } from "./migadu";
@@ -87,6 +88,11 @@ export const capabilityRegistry = {
 		description:
 			"Administer Migadu email hosting: onboard custom domains and create addresses and aliases",
 		capabilities: migadu,
+	},
+	ledger: {
+		description:
+			"Keep the personal books in EUR: record spending and income, check balances, and report net worth",
+		capabilities: ledger,
 	},
 	ai: {
 		description: "Run a model to judge, classify, or summarize something",

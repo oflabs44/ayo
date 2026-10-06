@@ -8,6 +8,9 @@ import { defineConfig } from "vitest/config";
 const migrations = await readD1Migrations(
 	path.join(import.meta.dirname, "migrations"),
 );
+const ledgerMigrations = await readD1Migrations(
+	path.join(import.meta.dirname, "migrations", "ledger"),
+);
 
 export default defineConfig({
 	plugins: [
@@ -18,8 +21,9 @@ export default defineConfig({
 				bindings: {
 					SEARCH_OFFLINE: "true",
 					TEST_MIGRATIONS: migrations,
+					TEST_LEDGER_MIGRATIONS: ledgerMigrations,
 				},
-				d1Databases: ["JOBS_DB"],
+				d1Databases: ["JOBS_DB", "LEDGER_DB"],
 				kvNamespaces: ["OAUTH_KV"],
 			},
 		}),
